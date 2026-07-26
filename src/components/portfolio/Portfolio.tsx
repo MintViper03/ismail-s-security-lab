@@ -35,8 +35,8 @@ const skills = {
     { name: "Metasploit", sev: "high" },
     { name: "Nmap", sev: "medium" },
     { name: "Wireshark", sev: "medium" },
-    { name: "Nikto", sev: "medium" },
     { name: "Nessus", sev: "medium" },
+    { name: "SQLmap", sev: "medium" },
     { name: "OWASP ZAP", sev: "medium" },
   ],
   "Security Concepts": [
@@ -64,42 +64,41 @@ const timeline = [
   {
     role: "Penetration Tester Intern",
     org: "KONSTENT",
-    period: "2024 — Present",
+    period: "June 2025 — October 2025",
     tag: "OFFENSIVE",
     bullets: [
-      "Executed authorized penetration tests across web, network, and mobile targets.",
-      "Documented findings with reproducible PoCs and CVSS-scored remediation guidance.",
-      "Collaborated with dev teams to close vulnerabilities before production deploy.",
-    ],
-  },
-  {
-    role: "Full Stack Developer & Security Engineer",
-    org: "BrandsKey Creative Studio",
-    period: "2023 — 2024",
-    tag: "BUILD + DEFEND",
-    bullets: [
-      "Investigated and remediated 3 compromised production WordPress sites.",
-      "Removed webshells, unauthorized admin accounts, and data-exfiltration scripts.",
-      "Hardened server configs, WAF rules, and file-integrity monitoring post-recovery.",
+      "Conducted web application penetration testing; identified critical vulnerabilities including SQLi, XSS, IDOR, and broken authentication using Burp Suite, Nmap, and Metasploit.",
+      "Delivered CVSS-scored vulnerability reports with proof-of-concept exploits and remediation guidance aligned with OWASP and PTES frameworks.",
     ],
   },
   {
     role: "Back End Developer",
     org: "Syncasist Business Solutions",
-    period: "2023",
+    period: "August 2025 — April 2026",
     tag: "BUILD",
     bullets: [
-      "Built secure REST APIs with input validation and parameterized queries.",
-      "Implemented authentication, session handling, and rate limiting.",
+      "Built secure RESTful APIs implementing authentication, authorization, and input validation; applied secure coding practices and code reviews to remediate vulnerabilities pre-deployment.",
+    ],
+  },
+  {
+    role: "Full Stack Developer & Security Engineer",
+    org: "BrandsKey Creative Studio",
+    period: "December 2025 — Present",
+    tag: "BUILD + DEFEND",
+    bullets: [
+      "Delivered 15+ production websites across Real Estate, Finance, Marketing, Wedding Planning, Marble/Hardware retail, and Food industries using React, Next.js, and WordPress/Shopify, deployed via Hostinger.",
+      "Led projects independently and as part of a team, owning client communication, timeline management, and mentoring a junior colleague.",
+      "Investigated and remediated 3 compromised WordPress sites: outdated-plugin and XML-RPC based exploitation, a root-directory webshell granting admin access, 10 unauthorized admin accounts, and a data-harvesting script exfiltrating site data — removed all malicious files, revoked access, and hardened sites against re-infection.",
+      "Integrated custom forms with Google Sheets, Google Drive, and email automation to streamline client lead-capture workflows.",
     ],
   },
   {
     role: "Member — Coding & Programming Club",
-    org: "L33tL3g10n",
-    period: "2022 — Present",
+    org: "L33tL3g10n — SPSU Udaipur",
+    period: "September 2024 — May 2026",
     tag: "COMMUNITY",
     bullets: [
-      "CTF challenges, tooling workshops, and peer-led offensive security sessions.",
+      "Competed in CTF challenges focused on binary exploitation, cryptography, and algorithmic problem-solving; advanced to National Coding League Semi-Finals.",
     ],
   },
 ];
@@ -334,7 +333,7 @@ function Recon() {
               <MetaRow k="status" v="available" dot="var(--defend)" />
               <MetaRow k="role" v="pentester / red team" />
               <MetaRow k="stack" v="python · ts · react" />
-              <MetaRow k="pgp" v="0xA1B4 ··· F2E9" />
+              <MetaRow k="education" v="BCA — Cybersecurity, SPSU" />
               <MetaRow k="uptime" v="24/7" />
             </aside>
           </Reveal>
@@ -520,7 +519,7 @@ function Report() {
         </Reveal>
 
         <Reveal>
-          <div className="mt-12 grid gap-4 sm:grid-cols-3">
+          <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Achievement
               title="TryHackMe — Top 8%"
               meta="51 rooms solved"
@@ -528,6 +527,10 @@ function Report() {
             <Achievement
               title="National Coding League"
               meta="Semi-Finalist"
+            />
+            <Achievement
+              title="RBI90 Quiz"
+              meta="State-Level Representative"
             />
             <Achievement
               title="Defronix Certified"
@@ -613,27 +616,26 @@ function IncidentCase() {
       </div>
       <div className="p-6 sm:p-8 font-mono-tech text-[13px] leading-relaxed">
         <div className="grid gap-1 text-muted">
-          <div><span className="text-text">$</span> case: brandskey_recovery_2024</div>
+          <div><span className="text-text">$</span> case: brandskey_site_recovery</div>
           <div><span className="text-text">$</span> targets: 3 × WordPress prod</div>
           <div><span className="text-text">$</span> client: <span className="px-1 mx-0.5" style={{ background: "#2b2f3a", color: "#2b2f3a", borderRadius: "2px" }}>[REDACTED]</span></div>
         </div>
 
         <div className="mt-6 space-y-2 text-text/90">
-          <LogLine time="00:03" k="ENUM" text="baseline diff vs. known-good WP core — 47 anomalous files identified" />
-          <LogLine time="00:17" k="FIND" text="webshell dropped at /wp-content/uploads/2024/.icons/theme.php" color="var(--critical)" />
-          <LogLine time="00:42" k="FIND" text="rogue admin account 'wp_maint_svc' with cookie-based backdoor" color="var(--critical)" />
-          <LogLine time="01:05" k="FIND" text="cron-triggered exfil to attacker-controlled endpoint every 6h" color="var(--high)" />
-          <LogLine time="01:38" k="CONT" text="isolated hosts, revoked API tokens, rotated all secrets" />
-          <LogLine time="02:20" k="ERAD" text="removed webshells, dropped rogue accounts, patched CVE-2024-XXXX" />
-          <LogLine time="03:15" k="HARD" text="deployed WAF rules, file-integrity monitor, MFA on all admin" color="var(--defend)" />
-          <LogLine time="04:00" k="DONE" text="3/3 sites restored — zero data loss, zero downtime post-recovery" color="var(--defend)" />
+          <LogLine time="00:01" k="RECON" text="outdated plugins and exposed XML-RPC endpoint identified as initial entry vector" />
+          <LogLine time="00:15" k="FIND" text="webshell planted in site root granting full admin-panel access" color="var(--critical)" />
+          <LogLine time="00:30" k="FIND" text="10 unauthorized admin accounts created by attacker across the 3 sites" color="var(--critical)" />
+          <LogLine time="00:50" k="FIND" text="hidden script scanning full site and exfiltrating data to a remote endpoint" color="var(--high)" />
+          <LogLine time="01:20" k="CONT" text="revoked unauthorized admin access, disabled XML-RPC" />
+          <LogLine time="01:45" k="ERAD" text="removed webshells and every malicious/injected file found" />
+          <LogLine time="02:10" k="HARD" text="patched plugins, hardened admin access, monitored for re-infection" color="var(--defend)" />
+          <LogLine time="02:30" k="DONE" text="3/3 sites restored and secured" color="var(--defend)" />
         </div>
 
         <div className="mt-6 pt-4 border-t border-border-hair flex flex-wrap items-center gap-x-6 gap-y-1 text-[11px] text-muted">
-          <span>MTTR: <span className="text-text">4h</span></span>
-          <span>Sites: <span className="text-text">3/3</span></span>
-          <span>Data loss: <span style={{ color: "var(--defend)" }}>none</span></span>
-          <span>Reinfection: <span style={{ color: "var(--defend)" }}>none (90d)</span></span>
+          <span>Sites: <span className="text-text">3/3 recovered</span></span>
+          <span>Attack vectors: <span className="text-text">outdated plugins · XML-RPC</span></span>
+          <span>Persistence found: <span style={{ color: "var(--critical)" }}>webshell · rogue admins · exfil script</span></span>
         </div>
       </div>
     </div>
@@ -702,7 +704,7 @@ function Contact() {
                 collaboration, and full-stack security work.
               </p>
               <a
-                href="mailto:ismail@example.com"
+                href="mailto:ismailsuwasra@gmail.com"
                 className="mt-8 inline-flex items-center gap-3 rounded-md px-6 py-4 font-mono-tech text-[12px] uppercase tracking-[0.22em] text-bg accent-glow"
                 style={{ background: "var(--accent)" }}
               >
@@ -714,9 +716,9 @@ function Contact() {
 
           <Reveal delay={80}>
             <ul className="rounded-lg hair-border bg-surface divide-y divide-[color:var(--border-hair)]">
-              <ContactRow icon={<Mail className="h-4 w-4" />} label="email" value="ismail@example.com" href="mailto:ismail@example.com" />
-              <ContactRow icon={<Linkedin className="h-4 w-4" />} label="linkedin" value="/in/ismail-murtaza" href="https://linkedin.com" />
-              <ContactRow icon={<Github className="h-4 w-4" />} label="github" value="/ismail-murtaza" href="https://github.com" />
+              <ContactRow icon={<Mail className="h-4 w-4" />} label="email" value="ismailsuwasra@gmail.com" href="mailto:ismailsuwasra@gmail.com" />
+              <ContactRow icon={<Linkedin className="h-4 w-4" />} label="linkedin" value="/in/ismailmurtaza" href="https://linkedin.com/in/ismailmurtaza" />
+              <ContactRow icon={<Github className="h-4 w-4" />} label="github" value="/MintViper03" href="https://github.com/MintViper03" />
               <ContactRow icon={<MapPin className="h-4 w-4" />} label="location" value="Udaipur, India" />
             </ul>
           </Reveal>
