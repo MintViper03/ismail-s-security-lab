@@ -2,18 +2,26 @@ import { useEffect, useRef } from "react";
 
 type Props = { mode: "attack" | "defend" };
 
+type Layer = "far" | "mid" | "near";
+
 type Node = {
   x: number;
   y: number;
   z: number;
-  // target velocities (damped toward)
   vx: number;
   vy: number;
   vz: number;
   tvx: number;
   tvy: number;
-  // phase for subtle depth breathing
   phase: number;
+  // per-node timing offset so nothing feels synchronized
+  jitter: number;
+  layer: Layer;
+  // cached per-layer characteristics
+  speedMul: number;
+  radiusMul: number;
+  glowMul: number;
+  alphaMul: number;
 };
 
 export function NetworkCanvas({ mode }: Props) {
@@ -32,10 +40,29 @@ export function NetworkCanvas({ mode }: Props) {
     let height = 0;
     let nodes: Node[] = [];
     const mouse = { x: 0, y: 0, tx: 0, ty: 0, active: false };
+    // camera-style parallax offset (damped toward target)
+    const cam = { x: 0, y: 0, tx: 0, ty: 0 };
+    const MAX_PARALLAX_X = 8;
+    const MAX_PARALLAX_Y = 6;
     let scanY = -0.2;
     const start = performance.now();
 
     const isSmall = () => window.innerWidth < 720;
+
+    const layerFor = (z: number): Layer =>
+      z < 0.34 ? "far" : z < 0.68 ? "mid" : "near";
+
+    const layerProps = (layer: Layer) => {
+      // Distinct feel per depth layer without changing overall identity
+      switch (layer) {
+        case "far":
+          return { speedMul: 0.55, radiusMul: 0.75, glowMul: 0.25, alphaMul: 0.55 };
+        case "mid":
+          return { speedMul: 0.85, radiusMul: 1.0, glowMul: 0.7, alphaMul: 0.9 };
+        case "near":
+          return { speedMul: 1.15, radiusMul: 1.35, glowMul: 1.25, alphaMul: 1.15 };
+      }
+    };
 
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
@@ -52,6 +79,8 @@ export function NetworkCanvas({ mode }: Props) {
         const z = Math.random();
         const vx = (Math.random() - 0.5) * 0.12;
         const vy = (Math.random() - 0.5) * 0.12;
+        const layer = layerFor(z);
+        const props = layerProps(layer);
         return {
           x,
           y,
@@ -62,6 +91,9 @@ export function NetworkCanvas({ mode }: Props) {
           tvx: vx,
           tvy: vy,
           phase: Math.random() * Math.PI * 2,
+          jitter: Math.random() * Math.PI * 2,
+          layer,
+          ...props,
         };
       });
     };
@@ -95,6 +127,25 @@ export function NetworkCanvas({ mode }: Props) {
 
       ctx.clearRect(0, 0, width, height);
 
+      // ---- camera-style parallax target ------------------------------------
+      // Cursor position maps to a tiny scene shift (few pixels only).
+      if (mouse.active) {
+        const nx = (mouse.tx / width - 0.5) * 2; // -1..1
+        const ny = (mouse.ty / height - 0.5) * 2;
+        // Invert so scene shifts opposite of cursor for a "look around" feel.
+        cam.tx = -nx * MAX_PARALLAX_X;
+        cam.ty = -ny * MAX_PARALLAX_Y;
+      } else {
+        cam.tx = 0;
+        cam.ty = 0;
+      }
+      // heavy damping — should be subliminal
+      cam.x += (cam.tx - cam.x) * 0.045;
+      cam.y += (cam.ty - cam.y) * 0.045;
+
+      ctx.save();
+      ctx.translate(cam.x, cam.y);
+
       // ambient depth wash — soft radial vignette biased to the accent
       const ambient = ctx.createRadialGradient(
         width * 0.5,
@@ -107,10 +158,12 @@ export function NetworkCanvas({ mode }: Props) {
       ambient.addColorStop(0, `rgba(${accent.r},${accent.g},${accent.b},0.045)`);
       ambient.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = ambient;
-      ctx.fillRect(0, 0, width, height);
+      ctx.fillRect(-MAX_PARALLAX_X, -MAX_PARALLAX_Y, width + MAX_PARALLAX_X * 2, height + MAX_PARALLAX_Y * 2);
 
-      // subtle grid
-      ctx.strokeStyle = "rgba(232,234,237,0.035)";
+      // ---- grid: preserved, only extremely subtle opacity breathing --------
+      // very low frequency sine, tiny amplitude around the original 0.035
+      const gridBreath = 0.035 + Math.sin(elapsed * 0.18) * 0.006;
+      ctx.strokeStyle = `rgba(232,234,237,${gridBreath.toFixed(4)})`;
       ctx.lineWidth = 1;
       const g = 60;
       for (let x = 0; x < width; x += g) {
@@ -126,22 +179,24 @@ export function NetworkCanvas({ mode }: Props) {
         ctx.stroke();
       }
 
-      // damped mouse follow — softens parallax
+      // damped mouse follow — softens local attraction
       mouse.x += (mouse.tx - mouse.x) * 0.08;
       mouse.y += (mouse.ty - mouse.y) * 0.08;
 
-      // update nodes: damp velocity toward target, gentle breathing on z
+      // update nodes: damp velocity toward target, per-layer speed, per-node jitter
       for (const n of nodes) {
         if (!reduced) {
-          // ease actual velocity toward target for buttery motion
           n.vx += (n.tvx - n.vx) * 0.04;
           n.vy += (n.tvy - n.vy) * 0.04;
 
-          n.x += n.vx * speedMul;
-          n.y += n.vy * speedMul;
+          // per-node phase offset breaks synchronized feel without adding speed
+          const wobble = Math.sin(elapsed * 0.35 + n.jitter) * 0.015;
+          const wobble2 = Math.cos(elapsed * 0.29 + n.jitter * 1.3) * 0.015;
+
+          n.x += (n.vx + wobble) * speedMul * n.speedMul;
+          n.y += (n.vy + wobble2) * speedMul * n.speedMul;
           n.z += n.vz;
 
-          // occasional gentle course change so motion never feels linear
           if (Math.random() < 0.004) {
             n.tvx = (Math.random() - 0.5) * 0.14;
             n.tvy = (Math.random() - 0.5) * 0.14;
@@ -169,7 +224,8 @@ export function NetworkCanvas({ mode }: Props) {
         }
       }
 
-      // links — two passes: soft wide halo, then crisp core
+      // links — two passes: soft wide halo, then crisp core. Depth now
+      // controls opacity much more aggressively.
       const linkDist = isSmall() ? 110 : 150;
       // halo pass
       ctx.lineWidth = 2.2;
@@ -182,8 +238,10 @@ export function NetworkCanvas({ mode }: Props) {
           const d = Math.hypot(dx, dy);
           if (d < linkDist) {
             const depth = (a.z + b.z) * 0.5;
+            // depth^2 emphasis: far links nearly vanish, near links glow more
+            const depthCurve = depth * depth;
             const t2 = 1 - d / linkDist;
-            const alpha = t2 * t2 * 0.09 * (0.5 + depth);
+            const alpha = t2 * t2 * 0.11 * (0.15 + depthCurve * 1.4);
             ctx.strokeStyle = `rgba(${accent.r},${accent.g},${accent.b},${alpha})`;
             ctx.beginPath();
             ctx.moveTo(a.x, a.y);
@@ -203,8 +261,9 @@ export function NetworkCanvas({ mode }: Props) {
           const d = Math.hypot(dx, dy);
           if (d < linkDist) {
             const depth = (a.z + b.z) * 0.5;
+            const depthCurve = depth * depth;
             const t2 = 1 - d / linkDist;
-            const alpha = t2 * 0.32 * (0.35 + depth * 0.9);
+            const alpha = t2 * 0.36 * (0.12 + depthCurve * 1.25);
             ctx.strokeStyle = `rgba(${accent.r},${accent.g},${accent.b},${alpha})`;
             ctx.beginPath();
             ctx.moveTo(a.x, a.y);
@@ -214,51 +273,53 @@ export function NetworkCanvas({ mode }: Props) {
         }
       }
 
-      // nodes — soft glow (near) + core dot, with subtle z breathing
+      // nodes — softer glow, per-layer weighting
       for (const n of nodes) {
         const breathe = reduced ? 0 : Math.sin(elapsed * 0.6 + n.phase) * 0.06;
         const zz = Math.max(0, Math.min(1, n.z + breathe));
-        const r = 1 + zz * 2.4;
+        const r = (1 + zz * 2.4) * n.radiusMul;
 
-        // glow (only for nearer / larger nodes so far ones stay crisp)
-        if (zz > 0.35) {
-          const glow = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 6);
+        // Softer, wider, dimmer glow — physical falloff, no neon.
+        if (zz > 0.3) {
+          const glowR = r * 7;
+          const glow = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, glowR);
+          const peak = 0.14 * zz * n.glowMul;
+          glow.addColorStop(0, `rgba(${accent.r},${accent.g},${accent.b},${peak})`);
+          // mid stop keeps the falloff soft rather than hard-edged
           glow.addColorStop(
-            0,
-            `rgba(${accent.r},${accent.g},${accent.b},${0.18 * zz})`,
+            0.45,
+            `rgba(${accent.r},${accent.g},${accent.b},${peak * 0.35})`,
           );
           glow.addColorStop(1, `rgba(${accent.r},${accent.g},${accent.b},0)`);
           ctx.fillStyle = glow;
           ctx.beginPath();
-          ctx.arc(n.x, n.y, r * 6, 0, Math.PI * 2);
+          ctx.arc(n.x, n.y, glowR, 0, Math.PI * 2);
           ctx.fill();
         }
 
-        ctx.fillStyle = `rgba(${accent.r},${accent.g},${accent.b},${0.3 + zz * 0.55})`;
+        const coreAlpha = (0.28 + zz * 0.55) * n.alphaMul;
+        ctx.fillStyle = `rgba(${accent.r},${accent.g},${accent.b},${Math.min(1, coreAlpha)})`;
         ctx.beginPath();
         ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // scanning sweep — gentler, longer period
-      const period = modeRef.current === "attack" ? 3.2 : 5.4;
-      scanY = ((elapsed % period) / period) * height;
-      const grad = ctx.createLinearGradient(0, scanY - 90, 0, scanY + 90);
+      // ---- volumetric horizontal light sweep -------------------------------
+      // Wider, slower, subliminal. No hard scan line.
+      const period = modeRef.current === "attack" ? 9.5 : 14.0;
+      scanY = ((elapsed % period) / period) * (height + 400) - 200;
+      const sweepHalf = Math.max(220, height * 0.42);
+      const grad = ctx.createLinearGradient(0, scanY - sweepHalf, 0, scanY + sweepHalf);
       grad.addColorStop(0, `rgba(${accent.r},${accent.g},${accent.b},0)`);
       grad.addColorStop(
         0.5,
-        `rgba(${accent.r},${accent.g},${accent.b},0.09)`,
+        `rgba(${accent.r},${accent.g},${accent.b},0.035)`,
       );
       grad.addColorStop(1, `rgba(${accent.r},${accent.g},${accent.b},0)`);
       ctx.fillStyle = grad;
-      ctx.fillRect(0, scanY - 90, width, 180);
+      ctx.fillRect(0, scanY - sweepHalf, width, sweepHalf * 2);
 
-      ctx.strokeStyle = `rgba(${accent.r},${accent.g},${accent.b},0.32)`;
-      ctx.lineWidth = 0.5;
-      ctx.beginPath();
-      ctx.moveTo(0, scanY);
-      ctx.lineTo(width, scanY);
-      ctx.stroke();
+      ctx.restore();
 
       raf = requestAnimationFrame(render);
     };
