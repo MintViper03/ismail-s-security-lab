@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Github,
   Linkedin,
@@ -17,6 +17,8 @@ import {
 import { NetworkCanvas } from "./NetworkCanvas";
 import { Reveal } from "./Reveal";
 import { ModeToggle } from "./ModeToggle";
+import { createGsapContext } from "@/lib/motion/gsap-context";
+import { prefersReducedMotion } from "@/lib/motion/prefers-reduced-motion";
 
 type Mode = "attack" | "defend";
 
