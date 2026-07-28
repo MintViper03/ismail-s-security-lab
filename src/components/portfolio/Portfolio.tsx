@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Github,
   Linkedin,
@@ -14,11 +14,10 @@ import {
   Award,
   FileWarning,
 } from "lucide-react";
-import { NetworkCanvas } from "./NetworkCanvas";
+import { Hero3D } from "./Hero3D";
 import { Reveal } from "./Reveal";
 import { ModeToggle } from "./ModeToggle";
-import { createGsapContext } from "@/lib/motion/gsap-context";
-import { prefersReducedMotion } from "@/lib/motion/prefers-reduced-motion";
+import { useLenis } from "@/hooks/useLenis";
 
 type Mode = "attack" | "defend";
 
@@ -114,6 +113,7 @@ const sevColor: Record<string, string> = {
 
 export function Portfolio() {
   const [mode, setMode] = useState<Mode>("defend");
+  useLenis();
 
   useEffect(() => {
     document.documentElement.setAttribute("data-mode", mode);
@@ -161,61 +161,10 @@ function Nav({ mode, setMode }: { mode: Mode; setMode: (m: Mode) => void }) {
 }
 
 function Hero({ mode }: { mode: Mode }) {
-  const scopeRef = useRef<HTMLDivElement>(null);
-  const [canvasReady, setCanvasReady] = useState(false);
-
-  // Give the network a beat to spin up before the content sequence begins,
-  // so the background feels like it's "coming online" first.
-  useEffect(() => {
-    if (prefersReducedMotion()) {
-      setCanvasReady(true);
-      return;
-    }
-    const id = window.setTimeout(() => setCanvasReady(true), 180);
-    return () => window.clearTimeout(id);
-  }, []);
-
-  useEffect(() => {
-    if (!canvasReady) return;
-    const ctx = createGsapContext(scopeRef.current, (gsap) => {
-      const tl = gsap.timeline({
-        defaults: { ease: "power3.out", duration: 0.7 },
-      });
-      tl.from("[data-hero='badge']", { opacity: 0, y: 10 })
-        .from(
-          "[data-hero='heading']",
-          { opacity: 0, y: 22, duration: 0.9 },
-          "-=0.35",
-        )
-        .from(
-          "[data-hero='desc']",
-          { opacity: 0, y: 14, duration: 0.75 },
-          "-=0.55",
-        )
-        .from(
-          "[data-hero='cta'] > *",
-          { opacity: 0, y: 10, stagger: 0.08, duration: 0.55 },
-          "-=0.4",
-        )
-        .from(
-          "[data-hero='stat']",
-          { opacity: 0, y: 12, stagger: 0.07, duration: 0.55 },
-          "-=0.3",
-        );
-    });
-    return () => ctx?.revert();
-  }, [canvasReady]);
-
-  // When reduced motion is on, GSAP context no-ops and .from() never runs,
-  // so nothing would ever become visible. Fall back to a static render.
-  const reduced =
-    typeof window !== "undefined" && prefersReducedMotion();
-  const initialHidden = !reduced;
-
   return (
     <section id="top" className="relative min-h-screen pt-14 overflow-hidden">
       <div className="absolute inset-0">
-        <NetworkCanvas mode={mode} />
+        <Hero3D mode={mode} />
         <div
           aria-hidden
           className="absolute inset-0"
@@ -226,99 +175,92 @@ function Hero({ mode }: { mode: Mode }) {
         />
       </div>
 
-      <div
-        ref={scopeRef}
-        className="relative mx-auto max-w-7xl px-5 sm:px-8 pt-24 sm:pt-32 pb-24"
-        style={initialHidden ? { visibility: canvasReady ? "visible" : "hidden" } : undefined}
-      >
-        <div
-          data-hero="badge"
-          className="flex items-center gap-3 font-mono-tech text-[11px] uppercase tracking-[0.22em] text-muted"
-        >
-          <span
-            className="inline-block h-1.5 w-1.5 rounded-full"
-            style={{ background: "var(--accent)" }}
-          />
-          <span>Recon · Handshake · 0x01</span>
-        </div>
+      <div className="relative mx-auto max-w-7xl px-5 sm:px-8 pt-24 sm:pt-32 pb-24">
+        <Reveal delay={50}>
+          <div className="flex items-center gap-3 font-mono-tech text-[11px] uppercase tracking-[0.22em] text-muted">
+            <span
+              className="inline-block h-1.5 w-1.5 rounded-full"
+              style={{ background: "var(--accent)" }}
+            />
+            <span>Recon · Handshake · 0x01</span>
+          </div>
+        </Reveal>
 
-        <h1
-          data-hero="heading"
-          className="mt-6 font-display text-[clamp(2.6rem,8vw,6.5rem)] font-bold leading-[0.95] tracking-tight"
-        >
-          Ismail{" "}
-          <span
-            style={{
-              background:
-                "linear-gradient(180deg, var(--text) 0%, color-mix(in oklab, var(--accent) 60%, var(--text)) 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}
-          >
-            Murtaza
-          </span>
-          <span
-            className="inline-block ml-2 h-[0.9em] w-[0.14em] align-baseline animate-pulse"
-            style={{ background: "var(--accent)" }}
-            aria-hidden
-          />
-        </h1>
-
-        <p
-          data-hero="desc"
-          className="mt-6 max-w-2xl text-lg sm:text-xl text-muted"
-        >
-          Penetration Tester &amp; Full-Stack Security Engineer.{" "}
-          <span className="text-text">
-            I break systems, then rebuild them stronger.
-          </span>
-        </p>
-
-        <div
-          data-hero="cta"
-          className="mt-10 flex flex-wrap items-center gap-3"
-        >
-          <a
-            href="#report"
-            className="group inline-flex items-center gap-2 rounded-md px-5 py-3 font-mono-tech text-[12px] uppercase tracking-[0.18em] text-bg transition-all accent-glow"
-            style={{ background: "var(--accent)" }}
-          >
-            View Work
-            <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-          </a>
-          <a
-            href="#contact"
-            className="inline-flex items-center gap-2 rounded-md px-5 py-3 font-mono-tech text-[12px] uppercase tracking-[0.18em] text-text hair-border hover:bg-surface transition-colors"
-          >
-            <Download className="h-3.5 w-3.5" />
-            Download Resume
-          </a>
-        </div>
-
-        <div className="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl">
-          {[
-            { k: "Rooms", v: "51", s: "TryHackMe" },
-            { k: "Recovered", v: "3", s: "Prod Sites" },
-            { k: "Detection", v: "95%", s: "AigisAI" },
-            { k: "Rank", v: "Top 8%", s: "THM Global" },
-          ].map((m) => (
-            <div
-              key={m.k}
-              data-hero="stat"
-              className="rounded-md hair-border bg-surface/60 backdrop-blur-sm p-4"
+        <Reveal delay={120}>
+          <h1 className="mt-6 font-display text-[clamp(2.6rem,8vw,6.5rem)] font-bold leading-[0.95] tracking-tight">
+            Ismail{" "}
+            <span
+              style={{
+                background:
+                  "linear-gradient(180deg, var(--text) 0%, color-mix(in oklab, var(--accent) 60%, var(--text)) 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
             >
-              <div className="font-mono-tech text-[10px] uppercase tracking-[0.18em] text-muted">
-                {m.k}
+              Murtaza
+            </span>
+            <span
+              className="inline-block ml-2 h-[0.9em] w-[0.14em] align-baseline animate-pulse"
+              style={{ background: "var(--accent)" }}
+              aria-hidden
+            />
+          </h1>
+        </Reveal>
+
+        <Reveal delay={240}>
+          <p className="mt-6 max-w-2xl text-lg sm:text-xl text-muted">
+            Penetration Tester &amp; Full-Stack Security Engineer.{" "}
+            <span className="text-text">
+              I break systems, then rebuild them stronger.
+            </span>
+          </p>
+        </Reveal>
+
+        <Reveal delay={340}>
+          <div className="mt-10 flex flex-wrap items-center gap-3">
+            <a
+              href="#report"
+              className="group inline-flex items-center gap-2 rounded-md px-5 py-3 font-mono-tech text-[12px] uppercase tracking-[0.18em] text-bg transition-all accent-glow"
+              style={{ background: "var(--accent)" }}
+            >
+              View Work
+              <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+            </a>
+            <a
+              href="#contact"
+              className="inline-flex items-center gap-2 rounded-md px-5 py-3 font-mono-tech text-[12px] uppercase tracking-[0.18em] text-text hair-border hover:bg-surface transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Download Resume
+            </a>
+          </div>
+        </Reveal>
+
+        <Reveal delay={480}>
+          <div className="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl">
+            {[
+              { k: "Rooms", v: "51", s: "TryHackMe" },
+              { k: "Recovered", v: "3", s: "Prod Sites" },
+              { k: "Detection", v: "95%", s: "AigisAI" },
+              { k: "Rank", v: "Top 8%", s: "THM Global" },
+            ].map((m) => (
+              <div
+                key={m.k}
+                className="rounded-md hair-border bg-surface/60 backdrop-blur-sm p-4"
+              >
+                <div className="font-mono-tech text-[10px] uppercase tracking-[0.18em] text-muted">
+                  {m.k}
+                </div>
+                <div className="mt-1 font-display text-2xl font-semibold">
+                  {m.v}
+                </div>
+                <div className="font-mono-tech text-[10px] text-muted mt-0.5">
+                  {m.s}
+                </div>
               </div>
-              <div className="mt-1 font-display text-2xl font-semibold">
-                {m.v}
-              </div>
-              <div className="font-mono-tech text-[10px] text-muted mt-0.5">
-                {m.s}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </Reveal>
       </div>
     </section>
   );
