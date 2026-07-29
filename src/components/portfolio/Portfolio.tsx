@@ -15,6 +15,7 @@ import {
   FileWarning,
 } from "lucide-react";
 import { Hero3D } from "./Hero3D";
+import { ProfilePhoto } from "./ProfilePhoto";
 import { Reveal } from "./Reveal";
 import { ModeToggle } from "./ModeToggle";
 import { useLenis } from "@/hooks/useLenis";
@@ -177,12 +178,20 @@ function Hero({ mode }: { mode: Mode }) {
 
       <div className="relative mx-auto max-w-7xl px-5 sm:px-8 pt-24 sm:pt-32 pb-24">
         <Reveal delay={50}>
-          <div className="flex items-center gap-3 font-mono-tech text-[11px] uppercase tracking-[0.22em] text-muted">
-            <span
-              className="inline-block h-1.5 w-1.5 rounded-full"
-              style={{ background: "var(--accent)" }}
+          <div className="flex items-center gap-4">
+            <ProfilePhoto
+              src="/photo.jpg"
+              alt="Ismail Murtaza"
+              variant="hero"
+              className="h-16 w-16 sm:h-20 sm:w-20 shrink-0"
             />
-            <span>Recon · Handshake · 0x01</span>
+            <div className="flex items-center gap-3 font-mono-tech text-[11px] uppercase tracking-[0.22em] text-muted">
+              <span
+                className="inline-block h-1.5 w-1.5 rounded-full"
+                style={{ background: "var(--accent)" }}
+              />
+              <span>Recon · Handshake · 0x01</span>
+            </div>
           </div>
         </Reveal>
 
@@ -329,15 +338,24 @@ function Recon() {
           </Reveal>
 
           <Reveal delay={100}>
-            <aside className="rounded-lg hair-border bg-surface p-6 sm:p-8 font-mono-tech text-[12px] leading-relaxed">
-              <MetaRow k="host" v="ismail.murtaza" />
-              <MetaRow k="location" v="Udaipur, India" />
-              <MetaRow k="status" v="available" dot="var(--defend)" />
-              <MetaRow k="role" v="pentester / red team" />
-              <MetaRow k="stack" v="python · ts · react" />
-              <MetaRow k="education" v="BCA — Cybersecurity, SPSU" />
-              <MetaRow k="uptime" v="24/7" />
-            </aside>
+            <div className="flex flex-col gap-6">
+              <ProfilePhoto
+                src="/photo.jpg"
+                alt="Ismail Murtaza"
+                variant="featured"
+                className="aspect-[4/5] w-full"
+              />
+
+              <aside className="rounded-lg hair-border bg-surface p-6 sm:p-8 font-mono-tech text-[12px] leading-relaxed">
+                <MetaRow k="host" v="ismail.murtaza" />
+                <MetaRow k="location" v="Udaipur, India" />
+                <MetaRow k="status" v="available" dot="var(--defend)" />
+                <MetaRow k="role" v="pentester / red team" />
+                <MetaRow k="stack" v="python · ts · react" />
+                <MetaRow k="education" v="BCA — Cybersecurity, SPSU" />
+                <MetaRow k="uptime" v="24/7" />
+              </aside>
+            </div>
           </Reveal>
         </div>
       </div>
