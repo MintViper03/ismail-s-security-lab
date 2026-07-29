@@ -20,7 +20,7 @@ export function ProfilePhoto({
     const wrapRef = useRef<HTMLDivElement>(null);
     const frameRef = useRef<HTMLDivElement>(null);
     const scanBarRef = useRef<HTMLDivElement>(null);
-    const overlayRef = useRef<HTMLDivElement>(null);
+    const vignetteRef = useRef<HTMLDivElement>(null);
 
     // --- reveal animation: clip-path wipe + traveling scan bar -----------
     useEffect(() => {
@@ -119,15 +119,15 @@ export function ProfilePhoto({
         };
     }, [variant]);
 
-    // --- hover: ease off the duotone tint to reveal more true color ------
+    // --- hover: ease off the vignette to let more true color breathe -----
     useEffect(() => {
         if (variant !== "featured") return;
         const wrap = wrapRef.current;
-        const overlay = overlayRef.current;
-        if (!wrap || !overlay) return;
+        const vignette = vignetteRef.current;
+        if (!wrap || !vignette) return;
 
-        const onEnter = () => gsap.to(overlay, { opacity: 0.4, duration: 0.4 });
-        const onLeave = () => gsap.to(overlay, { opacity: 0.78, duration: 0.5 });
+        const onEnter = () => gsap.to(vignette, { opacity: 0.35, duration: 0.4 });
+        const onLeave = () => gsap.to(vignette, { opacity: 1, duration: 0.5 });
 
         wrap.addEventListener("pointerenter", onEnter);
         wrap.addEventListener("pointerleave", onLeave);
@@ -145,6 +145,23 @@ export function ProfilePhoto({
             className={`relative select-none ${className}`}
             style={{ perspective: isFeatured ? "900px" : undefined }}
         >
+            {isFeatured && (
+                <>
+                    {/* soft glow blob behind the card for depth */}
+                    <div
+                        aria-hidden
+                        className="pointer-events-none absolute -inset-6 -z-10 rounded-[2rem] opacity-40 blur-3xl"
+                        style={{ background: "var(--accent)" }}
+                    />
+                    {/* offset accent frame peeking out behind the card */}
+                    <div
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 -z-10 rounded-lg border-2 translate-x-3 translate-y-3"
+                        style={{ borderColor: "var(--accent)", opacity: 0.5 }}
+                    />
+                </>
+            )}
+
             <div
                 ref={frameRef}
                 className="relative h-full w-full overflow-hidden rounded-lg hair-border accent-glow"
@@ -158,31 +175,41 @@ export function ProfilePhoto({
                     src={src}
                     alt={alt}
                     className="block w-full h-full object-cover"
-                    style={{ filter: "grayscale(1) contrast(1.15) brightness(0.95)" }}
+                    style={{ filter: "saturate(1.08) contrast(1.05)" }}
                     draggable={false}
                 />
 
-                {/* duotone tint, driven by the current attack/defend accent */}
+                {/* soft accent-colored vignette at the edges only — real photo
+            color stays untouched in the center */}
                 <div
-                    ref={overlayRef}
+                    ref={vignetteRef}
                     className="pointer-events-none absolute inset-0"
                     style={{
-                        background: "var(--accent)",
-                        mixBlendMode: "color",
-                        opacity: 0.78,
-                        transition: "background 400ms ease",
+                        background:
+                            "radial-gradient(ellipse at 50% 60%, transparent 45%, color-mix(in oklab, var(--accent) 35%, transparent) 130%)",
                     }}
                 />
 
                 {/* faint targeting/scan grid, reinforces the recon theme */}
                 <div
-                    className="pointer-events-none absolute inset-0 opacity-[0.12]"
+                    className="pointer-events-none absolute inset-0 opacity-[0.08]"
                     style={{
                         backgroundImage:
                             "linear-gradient(var(--accent) 1px, transparent 1px), linear-gradient(90deg, var(--accent) 1px, transparent 1px)",
                         backgroundSize: "24px 24px",
                     }}
                 />
+
+                {/* bottom gradient so any caption/label text stays legible */}
+                {isFeatured && (
+                    <div
+                        className="pointer-events-none absolute inset-x-0 bottom-0 h-24"
+                        style={{
+                            background:
+                                "linear-gradient(to top, rgba(11,14,20,0.65), transparent)",
+                        }}
+                    />
+                )}
 
                 {/* traveling scan bar shown during the reveal animation */}
                 <div
