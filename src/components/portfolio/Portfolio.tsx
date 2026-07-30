@@ -346,14 +346,8 @@ function Recon() {
 
           <Reveal delay={100}>
             <div className="flex flex-col gap-6">
-              <ProfilePhoto
-                src="/photo.jpg"
-                alt="Ismail Murtaza"
-                variant="featured"
-                className="aspect-[4/5] w-full"
-              />
-
               <aside className="rounded-lg hair-border bg-surface p-6 sm:p-8 font-mono-tech text-[12px] leading-relaxed">
+
                 <MetaRow k="host" v="ismail.murtaza" />
                 <MetaRow k="location" v="Udaipur, India" />
                 <MetaRow k="status" v="available" dot="var(--defend)" />
