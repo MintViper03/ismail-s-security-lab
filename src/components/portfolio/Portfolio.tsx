@@ -264,7 +264,20 @@ function Hero({ mode }: { mode: Mode }) {
             ))}
           </div>
         </Reveal>
+        </div>
+
+        <Reveal delay={200}>
+          <div className="mx-auto w-full max-w-[300px] sm:max-w-[340px] lg:max-w-none">
+            <ProfilePhoto
+              src="/photo.jpg"
+              alt="Ismail Murtaza — penetration tester and security engineer"
+              variant="featured"
+              className="aspect-[4/5] w-full"
+            />
+          </div>
+        </Reveal>
       </div>
+
     </section>
   );
 }
