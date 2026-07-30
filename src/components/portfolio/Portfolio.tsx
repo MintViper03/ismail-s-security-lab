@@ -176,24 +176,18 @@ function Hero({ mode }: { mode: Mode }) {
         />
       </div>
 
-      <div className="relative mx-auto max-w-7xl px-5 sm:px-8 pt-24 sm:pt-32 pb-24">
+      <div className="relative mx-auto max-w-7xl px-5 sm:px-8 pt-24 sm:pt-32 pb-24 grid gap-12 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,0.85fr)] lg:items-center">
+        <div className="min-w-0">
         <Reveal delay={50}>
-          <div className="flex items-center gap-4">
-            <ProfilePhoto
-              src="/photo.jpg"
-              alt="Ismail Murtaza"
-              variant="hero"
-              className="h-16 w-16 sm:h-20 sm:w-20 shrink-0"
+          <div className="flex items-center gap-3 font-mono-tech text-[11px] uppercase tracking-[0.22em] text-muted">
+            <span
+              className="inline-block h-1.5 w-1.5 rounded-full"
+              style={{ background: "var(--accent)" }}
             />
-            <div className="flex items-center gap-3 font-mono-tech text-[11px] uppercase tracking-[0.22em] text-muted">
-              <span
-                className="inline-block h-1.5 w-1.5 rounded-full"
-                style={{ background: "var(--accent)" }}
-              />
-              <span>Recon · Handshake · 0x01</span>
-            </div>
+            <span>Recon · Handshake · 0x01</span>
           </div>
         </Reveal>
+
 
         <Reveal delay={120}>
           <h1 className="mt-6 font-display text-[clamp(2.6rem,8vw,6.5rem)] font-bold leading-[0.95] tracking-tight">
