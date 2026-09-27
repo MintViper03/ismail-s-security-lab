@@ -10,6 +10,35 @@ import {
 import { type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
+import { VIEW_MODE_INIT_SCRIPT } from "@/lib/view-mode";
+import { contact, displayName, identity, languages, summary } from "@/content/resume";
+
+const pageTitle = `${displayName} — ${identity.headline.join(" | ")}`;
+const pageDescription = summary.sentences[0].text;
+
+/**
+ * schema.org Person built only from resume.ts. Deliberately no `url`, `image` or
+ * credentials: the site has no confirmed domain or social image, and qualifications
+ * still "in preparation" must not read as held.
+ */
+const [locality, region, country] = identity.location.split(", ");
+const personJsonLd = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "Person",
+  name: displayName,
+  jobTitle: identity.headline.join(" | "),
+  description: pageDescription,
+  email: contact.email.href,
+  telephone: contact.phone.display,
+  address: {
+    "@type": "PostalAddress",
+    addressLocality: locality,
+    addressRegion: region,
+    addressCountry: country,
+  },
+  knowsLanguage: languages.map((l) => l.language),
+  sameAs: [contact.linkedin.href, contact.github.href, contact.tryhackme.href],
+}).replace(/</g, "\\u003c"); // JSON escape for "<": nothing can close the script tag
 
 function NotFoundComponent() {
   return (
@@ -72,24 +101,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Ismail Murtaza — Penetration Tester & Security Engineer" },
-      {
-        name: "description",
-        content:
-          "Portfolio of Ismail Murtaza — offensive security practitioner, red teamer, and full-stack security engineer based in Udaipur, India.",
-      },
-      {
-        property: "og:title",
-        content: "Ismail Murtaza — Penetration Tester & Security Engineer",
-      },
-      {
-        property: "og:description",
-        content:
-          "Offensive security, incident response, and threat detection systems. Case studies, tooling, and research.",
-      },
+      // viewport-fit=cover + env(safe-area-inset-*) paddings keep content clear of notches
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
+      { title: pageTitle },
+      { name: "description", content: pageDescription },
+      { name: "author", content: displayName },
+      { name: "theme-color", content: "#0b0f14" },
+      { property: "og:title", content: pageTitle },
+      { property: "og:description", content: pageDescription },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
+      // no og:image / og:url: there is no social image and no confirmed domain
+      { name: "twitter:card", content: "summary" },
+      { name: "twitter:title", content: pageTitle },
+      { name: "twitter:description", content: pageDescription },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -98,7 +122,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap",
       },
     ],
   }),
@@ -110,9 +134,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    // data-view is set by the inline script before hydration, so React must not flag it
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: VIEW_MODE_INIT_SCRIPT }} />
         <HeadContent />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: personJsonLd }} />
       </head>
       <body>
         {children}
