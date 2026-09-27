@@ -1,42 +1,39 @@
 import { useEffect } from "react";
-import Lenis from "lenis";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-
-gsap.registerPlugin(ScrollTrigger);
 
 /**
- * Wires up Lenis smooth-scroll and syncs it with GSAP's ticker so
- * ScrollTrigger-driven animations stay perfectly in step with the
- * smoothed scroll position instead of the raw (jumpy) native scroll.
- *
- * Respects prefers-reduced-motion: if the user has that set, we skip
- * Lenis entirely and fall back to normal native scrolling.
+ * Lenis smooth scrolling for mouse-wheel users in Interactive mode. The library is
+ * loaded on demand, only where it applies: never on touch-first devices (native touch
+ * scrolling stays untouched, including on iOS Safari), never under reduced motion, and
+ * never in Reading mode. It drives its own rAF; nothing else ticks every frame.
  */
-export function useLenis() {
-    useEffect(() => {
-        const prefersReducedMotion = window.matchMedia(
-            "(prefers-reduced-motion: reduce)"
-        ).matches;
+export function useLenis(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled) return;
+    const fine = window.matchMedia("(pointer: fine)").matches;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!fine || reduced) return;
 
-        if (prefersReducedMotion) return;
-
-        const lenis = new Lenis({
-            duration: 1.1,
-            easing: (t) => 1 - Math.pow(1 - t, 3),
-            smoothWheel: true,
+    let lenis: { destroy: () => void } | null = null;
+    let cancelled = false;
+    import("lenis")
+      .then(({ default: Lenis }) => {
+        if (cancelled) return;
+        lenis = new Lenis({
+          duration: 1.1,
+          easing: (t: number) => 1 - Math.pow(1 - t, 3),
+          smoothWheel: true,
+          autoRaf: true,
+          // in-page links scroll smoothly and clear the fixed header
+          anchors: { offset: -80 },
         });
+      })
+      .catch(() => {
+        // smooth scrolling is optional; native scrolling keeps working
+      });
 
-        lenis.on("scroll", ScrollTrigger.update);
-
-        gsap.ticker.add((time) => {
-            lenis.raf(time * 1000);
-        });
-        gsap.ticker.lagSmoothing(0);
-
-        return () => {
-            lenis.destroy();
-            gsap.ticker.remove(lenis.raf);
-        };
-    }, []);
+    return () => {
+      cancelled = true;
+      lenis?.destroy();
+    };
+  }, [enabled]);
 }
