@@ -44,6 +44,17 @@ export const nav = {
   backToTop: "Back to top",
 } as const;
 
+/** The header's motion switch (independent of Interactive/Reading). */
+export const motionControl = {
+  label: "Motion",
+  on: "On",
+  off: "Off",
+  hintOn: "Motion is on — select to stop animation and the 3D loop",
+  hintOff: "Motion is off — select to allow animation",
+  paletteOff: "Turn motion off",
+  paletteOn: "Turn motion on",
+} as const;
+
 export const viewModeControl = {
   groupLabel: "Display mode",
   interactive: "Interactive",
@@ -253,4 +264,23 @@ export const paletteView = {
   contactSection: "View contact details",
   showExplore: "Show explore panel",
   resetExplore: "Reset exploration progress",
+  hints: {
+    move: "move",
+    select: "select",
+    close: "close",
+    open: "open",
+    or: "or",
+  },
+} as const;
+
+/** Navigation dock: the desktop rail's tools and the mobile bottom dock. */
+export const dockView = {
+  label: "Quick actions",
+  current: "Current section",
+  email: "Email",
+  reading: "Reading",
+  readingMode: "Reading mode",
+  commands: "Commands",
+  toReading: "Switch to Reading mode",
+  toInteractive: "Switch to Interactive mode",
 } as const;

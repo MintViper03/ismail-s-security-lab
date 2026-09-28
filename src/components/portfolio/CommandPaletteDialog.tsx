@@ -6,7 +6,9 @@ import {
   FileText,
   Hash,
   Mail,
+  Pause,
   Phone,
+  Play,
   RotateCcw,
   Sparkles,
 } from "lucide-react";
@@ -24,7 +26,7 @@ import { useViewMode } from "@/lib/view-mode";
 import { exploration, restoreExplorePanel, useExploration } from "@/lib/exploration";
 import { goToSection, openHref } from "@/lib/navigate";
 import { contact } from "@/content/resume";
-import { paletteView as ui, resumeDownload, sections } from "@/content/site";
+import { motionControl, paletteView as ui, resumeDownload, sections } from "@/content/site";
 
 /**
  * Predictable matching for a short, fixed action list: every typed word must appear in
@@ -59,7 +61,7 @@ export function CommandPaletteDialog({
   /** Element focused when the palette was requested; focus returns there on close. */
   opener: RefObject<HTMLElement | null>;
 }) {
-  const { mode, setMode } = useViewMode();
+  const { mode, setMode, reducedMotion, setReducedMotion } = useViewMode();
   const explore = useExploration();
   // action to run once the dialog has closed; `moveFocus` means it places focus itself
   const pending = useRef<{ fn: () => void; moveFocus: boolean } | null>(null);
@@ -123,6 +125,13 @@ export function CommandPaletteDialog({
                 onSelect={() => run(() => setMode(mode === "reading" ? "interactive" : "reading"))}
               >
                 {mode === "reading" ? ui.toInteractive : ui.toReading}
+              </Item>
+              <Item
+                value={reducedMotion ? motionControl.paletteOn : motionControl.paletteOff}
+                icon={reducedMotion ? <Play /> : <Pause />}
+                onSelect={() => run(() => setReducedMotion(!reducedMotion))}
+              >
+                {reducedMotion ? motionControl.paletteOn : motionControl.paletteOff}
               </Item>
             </CommandGroup>
 
@@ -190,6 +199,21 @@ export function CommandPaletteDialog({
               </Item>
             </CommandGroup>
           </CommandList>
+          {/* the keyboard model, always visible (not only in the sr-only description) */}
+          <p className="flex flex-wrap gap-x-4 gap-y-1 border-t border-line px-3 py-2.5 font-meta text-muted">
+            <span>
+              <Kbd>↑</Kbd> <Kbd>↓</Kbd> {ui.hints.move}
+            </span>
+            <span>
+              <Kbd>Enter</Kbd> {ui.hints.select}
+            </span>
+            <span>
+              <Kbd>Esc</Kbd> {ui.hints.close}
+            </span>
+            <span>
+              <Kbd>Ctrl K</Kbd> {ui.hints.or} <Kbd>/</Kbd> {ui.hints.open}
+            </span>
+          </p>
         </Command>
       </DialogContent>
     </Dialog>
@@ -222,4 +246,8 @@ function Item({
       )}
     </CommandItem>
   );
+}
+
+function Kbd({ children }: { children: ReactNode }) {
+  return <kbd className="rounded-[3px] border border-control px-1 text-text">{children}</kbd>;
 }

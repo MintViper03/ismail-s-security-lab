@@ -1,55 +1,75 @@
 import { useEffect, useRef, type AnchorHTMLAttributes, type ReactNode } from "react";
+import { readReducedMotion } from "@/lib/view-mode";
 
 /**
- * Wraps a link/button so it drifts toward a mouse cursor within its own bounds and eases
- * back on leave. Mouse only (never touch or pen), only on devices that can hover, off
- * under reduced motion. The transform is written straight to the element — no React
- * state per pointer move — and eased by a CSS transition.
+ * A link-button with two pointer responses, neither of which moves its clickable area:
+ *
+ * - Magnetic drift (`strength` > 0): the *label inside* eases a few pixels toward a mouse
+ *   cursor (capped at `maxShift`, default 4px). The anchor box never moves, so what you aim
+ *   at is what you hit. Mouse on hover-capable devices only; off with motion off.
+ * - Directional light: `--mx`/`--my` follow the pointer (mouse, pen or the point of a tap)
+ *   for the `.btn-light` highlight; keyboard focus shows it centred instead.
+ *
+ * Styles are written straight to the elements — no React state per pointer move.
  */
 export function MagneticButton({
   className = "",
-  strength = 0.4,
+  contentClassName = "inline-flex items-center justify-center gap-2",
+  strength = 0,
+  maxShift = 4,
   children,
   ...rest
 }: AnchorHTMLAttributes<HTMLAnchorElement> & {
+  contentClassName?: string;
   strength?: number;
+  maxShift?: number;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLAnchorElement>(null);
+  const inner = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     const el = ref.current;
-    if (!el || strength === 0) return;
+    const content = inner.current;
+    if (!el || !content) return;
     const canHover = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (!canHover || reduced) return;
+    const magnetic = strength > 0 && canHover && !readReducedMotion();
+    const clamp = (v: number) => Math.max(-maxShift, Math.min(maxShift, v));
 
-    // keep the button's own colour transitions alongside the drift
-    el.style.transition =
-      "transform 450ms cubic-bezier(0.22, 1, 0.36, 1), background-color 150ms, border-color 150ms, color 150ms";
-    const onMove = (e: PointerEvent) => {
-      if (e.pointerType !== "mouse") return;
+    const light = (e: PointerEvent) => {
       const r = el.getBoundingClientRect();
-      const x = (e.clientX - (r.left + r.width / 2)) * strength;
-      const y = (e.clientY - (r.top + r.height / 2)) * strength;
-      el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+      el.style.setProperty("--mx", `${Math.round(e.clientX - r.left)}px`);
+      el.style.setProperty("--my", `${Math.round(e.clientY - r.top)}px`);
+    };
+    const onMove = (e: PointerEvent) => {
+      light(e);
+      if (!magnetic || e.pointerType !== "mouse") return;
+      const r = el.getBoundingClientRect();
+      const x = clamp((e.clientX - (r.left + r.width / 2)) * strength);
+      const y = clamp((e.clientY - (r.top + r.height / 2)) * strength);
+      content.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
     };
     const onLeave = () => {
-      el.style.transform = "";
+      content.style.transform = "";
+      el.style.removeProperty("--mx");
+      el.style.removeProperty("--my");
     };
     el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerdown", light);
     el.addEventListener("pointerleave", onLeave);
     return () => {
       el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("pointerdown", light);
       el.removeEventListener("pointerleave", onLeave);
-      el.style.transform = "";
-      el.style.transition = "";
+      onLeave();
     };
-  }, [strength]);
+  }, [strength, maxShift]);
 
   return (
     <a ref={ref} className={className} {...rest}>
-      {children}
+      <span ref={inner} className={`magnet-content ${contentClassName}`}>
+        {children}
+      </span>
     </a>
   );
 }

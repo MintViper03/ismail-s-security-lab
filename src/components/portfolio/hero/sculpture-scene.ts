@@ -173,7 +173,7 @@ const RINGS: readonly RingSpec[] = [
 ];
 
 /** One machined arc: an annular sector, extruded with a small bevel, centred on z. */
-function sector(r: number, w: number, depth: number, a0: number, a1: number) {
+function sector(r: number, w: number, depth: number, a0: number, a1: number, detail = 16) {
   const ro = r + w / 2;
   const ri = r - w / 2;
   const s = new Shape();
@@ -188,13 +188,17 @@ function sector(r: number, w: number, depth: number, a0: number, a1: number) {
     bevelThickness: 0.006,
     bevelSize: 0.006,
     bevelSegments: 1,
-    curveSegments: Math.max(4, Math.round((a1 - a0) * 16)),
+    curveSegments: Math.max(3, Math.round((a1 - a0) * detail)),
   });
   g.translate(0, 0, -depth / 2);
   return g;
 }
 
 const ease = (x: number) => 1 - Math.pow(1 - Math.min(Math.max(x, 0), 1), 3);
+const smooth = (a: number, b: number, x: number) => {
+  const t = Math.min(Math.max((x - a) / (b - a), 0), 1);
+  return t * t * (3 - 2 * t);
+};
 
 export interface SculptureHandle {
   setFocus(focus: number): void;
@@ -224,6 +228,12 @@ export function createSculptureScene(
 ): SculptureHandle {
   const poster = opts.poster;
   const coarse = !poster && window.matchMedia("(pointer: coarse)").matches;
+  // constrained devices (touch-first, or ≤ 4 cores / ≤ 4 GB reported): the same object with
+  // lighter geometry (about half the arc segments, lower-poly band and pulses) and no
+  // clearcoat pass; the pixel ratio is already capped lower on touch devices
+  const hw = navigator as Navigator & { deviceMemory?: number };
+  const lite =
+    !poster && (coarse || (hw.hardwareConcurrency ?? 8) <= 4 || (hw.deviceMemory ?? 8) <= 4);
   const fine = !poster && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
   const renderer = new WebGLRenderer({
     canvas,
@@ -275,7 +285,7 @@ export function createSculptureScene(
       color: SILVER,
       metalness: 1,
       roughness: 0.24,
-      clearcoat: 0.6,
+      clearcoat: lite ? 0 : 0.6,
       clearcoatRoughness: 0.2,
       flatShading: true,
     }),
@@ -288,7 +298,7 @@ export function createSculptureScene(
   seams.scale.setScalar(1.004);
   core.add(seams);
   const bandMat = m(new MeshBasicMaterial({ color: CYAN }));
-  const band = new Mesh(g(new TorusGeometry(0.335, 0.008, 8, 96)), bandMat);
+  const band = new Mesh(g(new TorusGeometry(0.335, 0.008, lite ? 5 : 8, lite ? 48 : 96)), bandMat);
   band.rotation.set(1.2, 0.25, 0);
   coreEntrance.add(core, band);
   rig.add(coreEntrance);
@@ -302,7 +312,7 @@ export function createSculptureScene(
       color: new Color("#6d7885"),
       metalness: 0.92,
       roughness: 0.3,
-      clearcoat: 0.4,
+      clearcoat: lite ? 0 : 0.4,
       clearcoatRoughness: 0.3,
     }),
   );
@@ -324,6 +334,7 @@ export function createSculptureScene(
         spec.depth,
         i * step + spec.gap / 2,
         (i + 1) * step - spec.gap / 2,
+        lite ? 8 : 16,
       );
       (spec.lit.includes(i) ? lit : plain).push(sg);
     }
@@ -396,7 +407,7 @@ export function createSculptureScene(
   pathGeo.setAttribute("position", pathPos);
   const pathMat = m(new LineBasicMaterial({ color: CYAN, transparent: true, opacity: 0.38 }));
   rig.add(new LineSegments(pathGeo, pathMat));
-  const pulseGeo = g(new SphereGeometry(0.018, 8, 8));
+  const pulseGeo = g(new SphereGeometry(0.018, lite ? 5 : 8, lite ? 5 : 8));
   const pulseMat = m(new MeshBasicMaterial({ color: CYAN }));
   const pulses = parts.map(() => {
     const p = new Mesh(pulseGeo, pulseMat);
@@ -546,6 +557,10 @@ export function createSculptureScene(
     entranceT += dt;
     const arr = ARRANGEMENTS[focus];
     const k = snap ? 1 : 1 - Math.exp(-dt * 3.2);
+    // scroll: 0 at the top of the stage, 1 once it has scrolled out. As the hero leaves,
+    // the sculpture comes apart again (reverses when scrolling back up).
+    const p = poster ? 0 : Math.min(Math.max(opts.getProgress?.() ?? 0, 0), 1);
+    const sep = smooth(0.04, 0.55, p);
 
     // arrangement
     rings.forEach((r, i) => {
@@ -553,7 +568,7 @@ export function createSculptureScene(
       r.spin.rotation.z = t * r.spec.spin;
     });
     parts.forEach((p, i) => {
-      tmpV.set(...arr.parts[i]);
+      tmpV.set(...arr.parts[i]).multiplyScalar(1 + 0.5 * sep);
       tmpV.y += Math.sin(t * 0.6 + i * 1.7) * 0.022;
       p.position.lerp(tmpV, k);
       p.rotation.set(t * 0.25 + i, t * 0.35 + i * 2, 0);
@@ -569,8 +584,10 @@ export function createSculptureScene(
     rings.forEach((r, i) => {
       const ei = e(0.12 + i * 0.12);
       const f = ringFrom[i];
-      r.entrance.position.set(f.p[0] * (1 - ei), f.p[1] * (1 - ei), f.p[2] * (1 - ei));
-      r.entrance.rotation.set(f.r[0] * (1 - ei), f.r[1] * (1 - ei), f.r[2] * (1 - ei));
+      // apart during the entrance, together at rest, apart again as the hero scrolls out
+      const a = Math.max(1 - ei, sep * 1.4);
+      r.entrance.position.set(f.p[0] * a, f.p[1] * a, f.p[2] * a);
+      r.entrance.rotation.set(f.r[0] * a, f.r[1] * a, f.r[2] * a);
       r.entrance.scale.setScalar(0.86 + 0.14 * ei);
     });
     parts.forEach((p, i) => p.scale.setScalar(0.3 + 0.7 * e(0.5 + i * 0.08)));
@@ -581,7 +598,6 @@ export function createSculptureScene(
     cur.yaw += (arr.view.yaw - cur.yaw) * k;
     cur.pitch += (arr.view.pitch - cur.pitch) * k;
     cur.zoom += (arr.view.zoom - cur.zoom) * k;
-    const p = poster ? 0 : Math.min(Math.max(opts.getProgress?.() ?? 0, 0), 1);
     rig.rotation.set(
       cur.pitch + Math.sin(t * 0.09) * 0.03 + pointer.y * 0.12,
       cur.yaw + Math.sin(t * 0.12) * 0.06 + pointer.x * 0.22 + p * 0.5,
@@ -615,14 +631,20 @@ export function createSculptureScene(
     if (disposed) return;
     renderer.render(scene, camera);
     frames++;
-    // verification stats, written sparingly (not a DOM write every frame)
+    // verification stats: each attribute is written only when its value changes (the frame
+    // counter every 20 frames), so a running scene causes ~1 DOM write per 20 frames
     if (opts.debug && (frames < 3 || frames % 20 === 0 || canvas.dataset.focus !== String(focus))) {
-      canvas.dataset.triangles = String(renderer.info.render.triangles);
-      canvas.dataset.calls = String(renderer.info.render.calls);
-      canvas.dataset.entrance = entranceT >= 2.1 ? "assembled" : "assembling";
-      canvas.dataset.focus = String(focus);
-      canvas.dataset.frames = String(frames);
-      canvas.dataset.loop = `paused=${paused} onScreen=${onScreen} visible=${pageVisible}`;
+      const stats: Record<string, string> = {
+        triangles: String(renderer.info.render.triangles),
+        calls: String(renderer.info.render.calls),
+        entrance: entranceT >= 2.1 ? "assembled" : "assembling",
+        focus: String(focus),
+        lite: String(lite),
+        frames: String(frames),
+        loop: `paused=${paused} onScreen=${onScreen} visible=${pageVisible}`,
+      };
+      for (const [k, v] of Object.entries(stats))
+        if (canvas.dataset[k] !== v) canvas.dataset[k] = v;
     }
     if (!ready) {
       ready = true;

@@ -6,7 +6,6 @@ import { Sculpture } from "./hero/Sculpture";
 import { Tabs } from "./Tabs";
 import { useViewMode } from "@/lib/view-mode";
 import { cn } from "@/lib/utils";
-import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useStageParallax } from "@/hooks/useStageParallax";
 import { displayName, identity, skills, summary, type SkillGroup } from "@/content/resume";
 import { highlights } from "@/content/highlights";
@@ -42,21 +41,21 @@ const focusGroups = heroScene.focusGroups.map((id) => skills.find((g) => g.id ==
  * its faded lower edge, then role, actions and availability.
  */
 function Stage() {
+  // `motion` is false in Reading mode and whenever motion is switched off (header control
+  // or OS setting): no parallax, and the sculpture shows its static poster
   const { motion, mode, ready } = useViewMode();
   const reading = ready && mode === "reading";
-  // reduced motion: no parallax, and the sculpture shows its static poster
-  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const [focus, setFocus] = useState(0);
   const [paused, setPaused] = useState(false);
   const [live, setLive] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
-  useStageParallax(stageRef, motion && !reducedMotion);
+  useStageParallax(stageRef, motion);
 
   return (
     <div ref={stageRef} data-stage className="relative isolate overflow-hidden">
       <div
         aria-hidden
-        className="stage-exit-light absolute inset-x-0 top-0 -z-10 h-[calc(var(--spacing-header)+2.5rem+125vw)] max-h-full [mask-image:linear-gradient(to_bottom,#000_72%,transparent)] md:inset-y-0 md:h-auto md:max-h-none md:[mask-image:linear-gradient(to_bottom,#000_82%,transparent)]"
+        className="stage-exit-light absolute inset-x-0 top-0 -z-10 h-[calc(var(--spacing-header)+2.5rem+min(100vw,max(14rem,100svh-27rem)))] max-h-full [mask-image:linear-gradient(to_bottom,#000_72%,transparent)] split:inset-y-0 split:h-auto split:max-h-none split:[mask-image:linear-gradient(to_bottom,#000_82%,transparent)]"
       >
         <div className="stage-light absolute inset-0" />
       </div>
@@ -68,7 +67,7 @@ function Stage() {
         onLiveChange={setLive}
       />
 
-      <div className="mx-auto grid w-full max-w-[140rem] grid-cols-1 px-gutter pt-[calc(var(--spacing-header)+1rem)] md:min-h-[100svh] md:grid-cols-2 md:gap-x-8 md:pt-header lg:grid-cols-[minmax(0,1fr)_min(calc((100svh-var(--spacing-header)-1.5rem)*0.9),56%)] lg:gap-x-12 lg:pt-[calc(var(--spacing-header)+1.5rem)] xl:grid-cols-[minmax(0,1fr)_min(calc((100svh-var(--spacing-header)-1.5rem)*0.9),62%)]">
+      <div className="mx-auto grid w-full max-w-[140rem] grid-cols-1 px-gutter pt-[calc(var(--spacing-header)+1rem)] split:min-h-[100svh] split:grid-cols-2 split:gap-x-8 split:pt-header wide:grid-cols-[minmax(0,1fr)_min(calc((100svh-var(--spacing-header)-1.5rem)*0.9),56%)] wide:gap-x-12 wide:pt-[calc(var(--spacing-header)+1.5rem)] wider:grid-cols-[minmax(0,1fr)_min(calc((100svh-var(--spacing-header)-1.5rem)*0.9),62%)]">
         <StageCopy />
         <Portrait />
         {/* skill-focus HUD (the sculpture's three controls): below the name and photo up to
@@ -76,7 +75,7 @@ function Stage() {
             the face, leaving the space beside the portrait to the sculpture */}
         <div
           data-sculpture-avoid="box"
-          className="relative z-20 mt-10 reading:hidden md:col-start-1 md:row-start-2 md:mt-2 md:mb-10 md:max-w-xl xl:col-span-1 xl:col-start-2 xl:row-start-1 xl:mt-0 xl:mr-6 xl:mb-[clamp(1rem,3svh,3rem)] xl:w-[min(calc(100%-3rem),28rem)] xl:max-w-none xl:self-end xl:justify-self-end"
+          className="relative z-20 mt-10 reading:hidden split:col-start-1 split:row-start-2 split:mt-2 split:mb-10 split:max-w-xl wider:col-span-1 wider:col-start-2 wider:row-start-1 wider:mt-0 wider:mr-6 wider:mb-[clamp(1rem,3svh,3rem)] wider:w-[min(calc(100%-3rem),28rem)] wider:max-w-none wider:self-end wider:justify-self-end"
         >
           <FocusHud focus={focus} setFocus={setFocus} />
         </div>
@@ -85,7 +84,7 @@ function Stage() {
             button's slot is always reserved, so it appearing later shifts nothing */}
         <div
           data-sculpture-avoid="box"
-          className="relative z-20 mt-3 flex items-center justify-self-end rounded-md bg-bg/75 pr-11 pl-3 backdrop-blur-md reading:hidden md:col-start-2 md:row-start-2 md:mt-2 md:self-start xl:col-start-1 xl:row-start-1 xl:mt-0 xl:mb-[clamp(1rem,3svh,3rem)] xl:self-end xl:justify-self-start"
+          className="relative z-20 mt-3 flex items-center justify-self-end rounded-md bg-bg/75 pr-11 pl-3 backdrop-blur-md reading:hidden split:col-start-2 split:row-start-2 split:mt-2 split:self-start wider:col-start-1 wider:row-start-1 wider:mt-0 wider:mb-[clamp(1rem,3svh,3rem)] wider:self-end wider:justify-self-start"
         >
           <Meta className="py-2.5 pr-3">
             <span className="hidden text-text sm:inline">{heroScene.caption} · </span>
@@ -116,8 +115,8 @@ function StageCopy() {
   const [first, last] = displayName.split(" ");
   return (
     // a size container: the name scales with the column it has, never overflowing it
-    <div className="stage-exit-copy @container relative z-20 flex flex-col md:col-start-1 md:row-start-1 md:self-center md:py-12 lg:py-16">
-      <Reveal className="order-2 md:order-none">
+    <div className="stage-exit-copy @container relative z-20 flex flex-col split:col-start-1 split:row-start-1 split:self-center split:py-12 wide:py-16 short:py-5">
+      <Reveal className="order-5 mt-8 split:order-none split:mt-0">
         <div data-sculpture-avoid="text">
           <Meta>
             <span className="text-accent">{s.num}</span> / {s.rail} · {identity.location}
@@ -125,25 +124,25 @@ function StageCopy() {
         </div>
       </Reveal>
 
-      <Reveal delay={60} className="order-1 md:order-none">
+      <Reveal delay={60} className="order-1 split:order-none">
         {/* text content stays exactly the resume name; the two lines are visual only */}
         <h1
           id={`${s.id}-title`}
           data-sculpture-avoid="text"
-          className="-mt-[0.5em] mb-6 text-[min(10.5rem,19.5cqi)] leading-[0.86] font-bold tracking-[-0.055em] text-text md:mt-5 md:mb-0"
+          className="-mt-[0.5em] mb-6 text-[min(5.75rem,19.5cqi)] split:text-[min(10.5rem,19.5cqi)] leading-[0.86] font-bold tracking-[-0.055em] text-text split:mt-5 split:mb-0 short:mt-3"
         >
           <span className="block">{first}</span>{" "}
-          <span className="block text-transparent [-webkit-text-stroke:1.5px_var(--color-text)] lg:[-webkit-text-stroke-width:2px] reading:text-text">
+          <span className="block text-transparent [-webkit-text-stroke:1.5px_var(--color-text)] wide:[-webkit-text-stroke-width:2px] reading:text-text">
             {last}
           </span>
         </h1>
       </Reveal>
 
-      <Reveal delay={120} className="order-3 md:order-none">
+      <Reveal delay={120} className="order-3 split:order-none">
         {/* text content is exactly "Penetration Tester | Security Engineer | Red Teamer" */}
         <p
           data-sculpture-avoid="text"
-          className="mt-5 max-w-[34rem] text-lede font-medium text-text md:mt-8"
+          className="mt-5 max-w-[34rem] text-lede font-medium text-text split:mt-8 short:mt-4"
         >
           {identity.headline.map((role, i) => {
             const end = i === identity.headline.length - 1;
@@ -161,11 +160,12 @@ function StageCopy() {
         </p>
       </Reveal>
 
-      <Reveal delay={170} className="order-4 md:order-none">
-        {/* stacked full-width on phones, a row from 640px */}
+      <Reveal delay={170} className="order-4 split:order-none">
+        {/* stacked: the primary action full width, the two others sharing a row (they wrap
+            only if they must); a single row from 640px */}
         <div
           data-sculpture-avoid="children"
-          className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center md:mt-10"
+          className="mt-7 flex flex-wrap items-center gap-3 split:mt-10 short:mt-5"
         >
           <ActionLink href={cta.experience.href} className="w-full sm:w-auto">
             {cta.experience.label}
@@ -175,7 +175,7 @@ function StageCopy() {
             href={resumeDownload.href}
             download={resumeDownload.fileName}
             variant="secondary"
-            className="w-full bg-bg/60 backdrop-blur-sm sm:w-auto"
+            className="flex-auto bg-bg/60 px-3.5 backdrop-blur-sm sm:flex-none sm:px-5"
           >
             <Download aria-hidden className="h-4 w-4" />
             {resumeDownload.label}
@@ -183,17 +183,17 @@ function StageCopy() {
           <ActionLink
             href={cta.contact.href}
             variant="secondary"
-            className="w-full bg-bg/60 backdrop-blur-sm sm:w-auto"
+            className="flex-auto bg-bg/60 px-3.5 backdrop-blur-sm sm:flex-none sm:px-5"
           >
             {cta.contact.label}
           </ActionLink>
         </div>
       </Reveal>
 
-      <Reveal delay={220} className="order-5 md:order-none">
+      <Reveal delay={220} className="order-6 split:order-none">
         <div
           data-sculpture-avoid="text"
-          className="mt-8 max-w-[34rem] border-l-2 border-accent pl-5 md:mt-10"
+          className="mt-8 max-w-[34rem] border-l-2 border-accent pl-5 split:mt-10"
         >
           <Meta>{labels.availability}</Meta>
           <p className="mt-1 text-small text-text">{summary.availability.text}</p>
@@ -201,7 +201,10 @@ function StageCopy() {
       </Reveal>
 
       {/* Reading mode: every focus group in normal flow instead of the HUD tabs */}
-      <div data-sculpture-avoid="box" className="order-6 mt-10 hidden reading:block md:order-none">
+      <div
+        data-sculpture-avoid="box"
+        className="order-7 mt-10 hidden reading:block split:order-none"
+      >
         <h2 className="font-meta text-muted">{heroScene.focusLabel}</h2>
         <div className="mt-4">
           <AllFocusGroups />
@@ -212,17 +215,22 @@ function StageCopy() {
 }
 
 /**
- * A decorative plane that moves `depth` px per unit of pointer travel (`.depth`).
+ * A decorative plane that moves `depth` px per unit of pointer travel (`.depth`) and, as
+ * the hero scrolls out, separates from the photograph by `sep` (the geometry comes apart
+ * while the portrait itself only recedes, staying fully readable).
  * `plane` records whether it sits behind or in front of the photograph.
  */
 function DepthLayer({
   depth,
   plane,
+  sep,
   className,
   children,
 }: {
   depth: number;
   plane: "back" | "front";
+  /** How far (px) this plane drifts away as the hero scrolls out (`.geo-sep`). */
+  sep: readonly [number, number];
   className?: string;
   children?: ReactNode;
 }) {
@@ -231,11 +239,13 @@ function DepthLayer({
       aria-hidden
       data-plane={plane}
       className={cn(
-        "depth pointer-events-none absolute",
+        "depth geo-sep pointer-events-none absolute",
         plane === "back" ? "z-0" : "z-20",
         className,
       )}
-      style={{ "--depth": depth } as CSSProperties}
+      style={
+        { "--depth": depth, "--sep-x": `${sep[0]}px`, "--sep-y": `${sep[1]}px` } as CSSProperties
+      }
     >
       {children}
     </div>
@@ -251,25 +261,29 @@ function DepthLayer({
  */
 function Portrait() {
   return (
-    <figure className="stage-exit-portrait relative isolate order-first mb-2 md:order-none md:col-start-2 md:row-start-1 md:mb-0 md:w-[min(100%,calc(min(86svh,58rem)*0.9))] md:self-center md:justify-self-end lg:w-full lg:self-end md:reading:self-start">
+    <figure className="stage-exit-portrait relative isolate order-first mb-2 split:order-none split:col-start-2 split:row-start-1 split:mb-0 split:w-[min(100%,calc(min(86svh,58rem)*0.9))] split:self-center split:justify-self-end wide:w-full wide:self-end split:reading:self-start">
       {/* behind: ultraviolet backlight, a graphite plane offset down-left, a drafting outline up-right */}
       <DepthLayer
         depth={14}
+        sep={[-44, -36]}
         plane="back"
         className="portrait-spill-uv -top-[8%] -left-[18%] h-[70%] w-[80%]"
       />
       <DepthLayer
         depth={28}
+        sep={[-56, 40]}
         plane="back"
-        className="top-[9%] -left-[4%] right-[10%] -bottom-[3%] bg-[linear-gradient(135deg,var(--surface-2),var(--surface)_60%)] ring-1 ring-line md:-left-[7%]"
+        className="top-[9%] -left-[4%] right-[10%] -bottom-[3%] bg-[linear-gradient(135deg,var(--surface-2),var(--surface)_60%)] ring-1 ring-line split:-left-[7%]"
       />
       <DepthLayer
         depth={20}
+        sep={[48, -40]}
         plane="back"
-        className="top-[4%] left-[12%] -right-[3%] bottom-[16%] border border-control/60 md:-right-[5%]"
+        className="top-[4%] left-[12%] -right-[3%] bottom-[16%] border border-control/60 split:-right-[5%]"
       />
       <DepthLayer
         depth={10}
+        sep={[40, 0]}
         plane="back"
         className="portrait-spill-key top-[12%] -right-[6%] h-[58%] w-[14%]"
       />
@@ -278,13 +292,13 @@ function Portrait() {
       <div className="depth relative z-10" style={{ "--depth": 4 } as CSSProperties}>
         <div
           data-stage-anchor
-          className="portrait-chamfer relative aspect-[4/5] w-full overflow-hidden bg-surface md:aspect-[9/10]"
+          className="portrait-chamfer relative aspect-square max-h-[max(14rem,calc(100svh-27rem))] w-full overflow-hidden bg-surface split:aspect-[9/10] split:max-h-none"
         >
           <picture>
             <source
               type="image/webp"
               srcSet="/hero-portrait-640.webp 640w, /hero-portrait-960.webp 960w, /hero-portrait-1200.webp 1200w"
-              sizes="(min-width: 64rem) min(calc((100vh - 5.5rem) * 0.9), 58vw), (min-width: 48rem) 46vw, 100vw"
+              sizes="(min-width: 64rem) min(calc((100vh - 5.5rem) * 0.9), 58vw), (min-width: 48rem) and (orientation: landscape) 46vw, 100vw"
             />
             <img
               src="/hero-portrait-960.jpg"
@@ -319,18 +333,21 @@ function Portrait() {
       {/* in front: drafting accents at the edges only (corner bracket, scale, a lit shard) */}
       <DepthLayer
         depth={-10}
+        sep={[-32, -32]}
         plane="front"
-        className="-top-3 -left-3 h-12 w-12 border-t-2 border-l-2 border-accent md:-top-4 md:-left-4 md:h-16 md:w-16"
+        className="-top-3 -left-3 h-12 w-12 border-t-2 border-l-2 border-accent split:-top-4 split:-left-4 split:h-16 split:w-16"
       />
       <DepthLayer
         depth={-12}
+        sep={[36, -16]}
         plane="front"
         className="portrait-scale top-[14%] -right-5 h-[42%] w-3"
       />
       <DepthLayer
         depth={-24}
+        sep={[-52, 48]}
         plane="front"
-        className="top-[64%] -left-[7%] aspect-square w-[22%] rotate-45 border border-accent/50 bg-accent/[0.04] md:-left-[10%]"
+        className="top-[64%] -left-[7%] aspect-square w-[22%] rotate-45 border border-accent/50 bg-accent/[0.04] split:-left-[10%]"
       />
     </figure>
   );
@@ -370,7 +387,7 @@ function FocusTabs({ focus, setFocus }: { focus: number; setFocus: (i: number) =
       tabs={focusGroups.map((g) => ({ key: g.id, label: g.label }))}
       selected={focus}
       onSelect={setFocus}
-      listClassName="grid-cols-1 min-[360px]:grid-cols-3 [&>button]:px-1 [&>button]:text-[0.8125rem] sm:[&>button]:px-2 sm:[&>button]:text-small lg:[&>button]:px-1 lg:[&>button]:text-[0.8125rem]"
+      listClassName="grid-cols-1 min-[360px]:grid-cols-3 [&>button]:px-1 [&>button]:text-[0.8125rem] sm:[&>button]:px-2 sm:[&>button]:text-small wide:[&>button]:px-1 wide:[&>button]:text-[0.8125rem]"
       panelClassName="min-h-[3.75rem]"
     >
       <SkillChips compact items={focusGroups[focus].items} />
@@ -399,32 +416,32 @@ function AllFocusGroups() {
 function ProfessionalSummary() {
   const [first, ...rest] = summary.sentences;
   return (
-    <Reveal>
-      <div className="mt-14 grid gap-10 border-t border-line pt-10 lg:mt-16 lg:grid-cols-12 lg:gap-12">
-        <div className="lg:col-span-7">
-          <h2 className="font-meta text-muted">{labels.summaryHeading}</h2>
-          <p className="mt-4 max-w-[64ch] text-lede text-muted">
-            <span className="text-text">{first.text}</span>{" "}
-            {rest.map((sentence) => sentence.text).join(" ")}
-          </p>
-        </div>
-        <div className="lg:col-span-5">
-          <h3 className="font-meta text-muted">{labels.figuresHeading}</h3>
-          <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-6">
-            {highlights.map((h) => (
-              <div key={h.source} className="flex flex-col gap-1">
-                <dt className="order-2 text-small text-muted">
-                  {h.caption}
-                  {h.context && <span className="mt-0.5 block font-meta">{h.context}</span>}
-                </dt>
-                <dd className="order-1 text-h2 font-semibold tracking-[-0.02em] text-text tabular">
-                  {h.value}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
+    <div className="summary-seq relative mt-14 grid gap-10 border-t border-line pt-10 lg:mt-16 lg:grid-cols-12 lg:gap-12">
+      {/* the identity hands off here: a light draws along the rule, then the summary rises */}
+      <span aria-hidden className="summary-rule rule-glow -top-px left-0 w-2/5" />
+      <div className="summary-rise lg:col-span-7">
+        <h2 className="font-meta text-muted">{labels.summaryHeading}</h2>
+        <p className="mt-4 max-w-[64ch] text-lede text-muted">
+          <span className="text-text">{first.text}</span>{" "}
+          {rest.map((sentence) => sentence.text).join(" ")}
+        </p>
       </div>
-    </Reveal>
+      <div className="summary-rise lg:col-span-5" style={{ "--i": 1 } as CSSProperties}>
+        <h3 className="font-meta text-muted">{labels.figuresHeading}</h3>
+        <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-6">
+          {highlights.map((h) => (
+            <div key={h.source} className="flex flex-col gap-1">
+              <dt className="order-2 text-small text-muted">
+                {h.caption}
+                {h.context && <span className="mt-0.5 block font-meta">{h.context}</span>}
+              </dt>
+              <dd className="order-1 text-h2 font-semibold tracking-[-0.02em] text-text tabular">
+                {h.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </div>
   );
 }

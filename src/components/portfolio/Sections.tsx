@@ -1,6 +1,5 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { ArrowUpRight, BadgeCheck, Clock, Download, Mail, Phone } from "lucide-react";
-import { Reveal } from "./Reveal";
 import { ActionLink, Container, FigureText, Meta, SectionShell } from "./primitives";
 import {
   achievements,
@@ -30,9 +29,9 @@ function SubHeading({ children, count }: { children: ReactNode; count?: number }
 
 export function Credentials() {
   return (
-    <SectionShell id="credentials">
+    <SectionShell id="credentials" motif="quiet">
       <div className="grid gap-14 lg:grid-cols-12 lg:gap-12">
-        <Reveal className="lg:col-span-5">
+        <div className="lg:col-span-5">
           <SubHeading count={certifications.length}>{labels.certifications}</SubHeading>
           <ul className="flex flex-col gap-4">
             {certifications.map((c) => {
@@ -110,9 +109,9 @@ export function Credentials() {
               );
             })}
           </ul>
-        </Reveal>
+        </div>
 
-        <Reveal className="lg:col-span-7">
+        <div className="lg:col-span-7">
           <SubHeading count={achievements.length}>{labels.achievements}</SubHeading>
           <ol className="border-t border-line">
             {achievements.map((a, i) => (
@@ -140,7 +139,7 @@ export function Credentials() {
               </li>
             ))}
           </ol>
-        </Reveal>
+        </div>
       </div>
     </SectionShell>
   );
@@ -150,9 +149,9 @@ export function Credentials() {
 
 export function EducationSection() {
   return (
-    <SectionShell id="education">
+    <SectionShell id="education" motif="quiet">
       <div className="grid gap-14 lg:grid-cols-12 lg:gap-12">
-        <Reveal className="lg:col-span-8">
+        <div className="lg:col-span-8">
           <SubHeading count={education.length}>{labels.education}</SubHeading>
           <ol className="border-t border-line">
             {education.map((e) => (
@@ -173,9 +172,9 @@ export function EducationSection() {
               </li>
             ))}
           </ol>
-        </Reveal>
+        </div>
 
-        <Reveal className="lg:col-span-4">
+        <div className="lg:col-span-4">
           <SubHeading count={languages.length}>{labels.languages}</SubHeading>
           {/* reads exactly as the resume: "English (Professional)", "Hindi (Native)" */}
           <ul className="border-t border-line">
@@ -186,14 +185,18 @@ export function EducationSection() {
               </li>
             ))}
           </ul>
-        </Reveal>
+        </div>
       </div>
     </SectionShell>
   );
 }
 
-/* ---------- 07 Contact ------------------------------------------------- */
+/* ---------- 07 Contact: the finale ------------------------------------ */
 
+/**
+ * The page's last composition: quieter sections lead here, then one clear action (the
+ * email address, set large), the resume, every channel, and a single controlled 3D accent.
+ */
 export function ContactSection() {
   const channels = [
     { label: labels.email, link: contact.email, external: false },
@@ -204,13 +207,23 @@ export function ContactSection() {
   ];
 
   return (
-    <SectionShell id="contact">
+    <SectionShell id="contact" motif="finale">
       <div className="grid gap-14 lg:grid-cols-12 lg:gap-12">
-        <Reveal className="lg:col-span-7">
+        <div className="finale-rise lg:col-span-7">
           <Meta>{labels.availability}</Meta>
           <p className="mt-3 max-w-[34ch] text-h3 font-medium tracking-[-0.01em] text-text">
             {summary.availability.text}
           </p>
+          <a
+            href={contact.email.href}
+            className="group mt-10 inline-flex max-w-full items-center gap-3 text-[clamp(1.5rem,0.9rem+2.4vw,3rem)] leading-tight font-semibold tracking-[-0.025em] break-all text-text underline decoration-accent/40 decoration-2 underline-offset-[10px] transition-[text-decoration-color] duration-150 hover:decoration-accent"
+          >
+            {contact.email.display}
+            <ArrowUpRight
+              aria-hidden
+              className="h-[0.8em] w-[0.8em] shrink-0 text-accent transition-transform duration-150 group-hover:translate-x-1 group-hover:-translate-y-1"
+            />
+          </a>
           <div className="mt-9 flex flex-wrap gap-3">
             <ActionLink href={contact.email.href}>
               <Mail aria-hidden className="h-4 w-4" />
@@ -225,9 +238,10 @@ export function ContactSection() {
               {resumeDownload.label}
             </ActionLink>
           </div>
-        </Reveal>
+        </div>
 
-        <Reveal className="lg:col-span-5">
+        <div className="lg:col-span-5">
+          <ContactAccent />
           <SubHeading>{labels.contactChannels}</SubHeading>
           <ul className="border-t border-line">
             {channels.map((c) => (
@@ -247,7 +261,7 @@ export function ContactSection() {
                   {c.external ? (
                     <ArrowUpRight
                       aria-hidden
-                      className="h-4 w-4 shrink-0 text-muted transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-text"
+                      className="h-4 w-4 shrink-0 text-muted transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-text"
                     />
                   ) : c.link.href.startsWith("tel:") ? (
                     <Phone
@@ -269,9 +283,76 @@ export function ContactSection() {
               <span className="text-body text-text">{identity.location}</span>
             </li>
           </ul>
-        </Reveal>
+        </div>
       </div>
     </SectionShell>
+  );
+}
+
+const CUBE_FACES = [
+  "translateZ(28px)",
+  "rotateY(180deg) translateZ(28px)",
+  "rotateY(90deg) translateZ(28px)",
+  "rotateY(-90deg) translateZ(28px)",
+  "rotateX(90deg) translateZ(28px)",
+  "rotateX(-90deg) translateZ(28px)",
+];
+
+/**
+ * The contact section's one 3D accent, in CSS 3D (no second WebGL canvas): three
+ * segmented rings around a faceted core, echoing the hero sculpture. The rings fold into
+ * place as the section scrolls in; after that it turns slowly (48 s per revolution), and
+ * only while on screen. With motion off it is a still object.
+ */
+function ContactAccent() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) =>
+      el.toggleAttribute("data-inview", e.isIntersecting),
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <div
+      ref={ref}
+      aria-hidden
+      className="accent-3d relative mx-auto mb-12 h-52 w-52 sm:h-60 sm:w-60 lg:mx-0 lg:mb-14"
+    >
+      <div className="absolute inset-[12%] rounded-full bg-[radial-gradient(closest-side,rgb(34_225_255/0.16),transparent)] blur-2xl" />
+      <div className="accent-rig absolute inset-0">
+        <div className="accent-ring absolute inset-0" style={{ transform: "rotateX(72deg)" }} />
+        <div
+          className="accent-ring absolute inset-[10%]"
+          style={{
+            transform: "rotateY(62deg)",
+            borderColor: "color-mix(in oklab, var(--uv) 70%, transparent)",
+          }}
+        />
+        <div
+          className="accent-ring absolute inset-[22%]"
+          style={{ transform: "rotateY(-56deg) rotateX(24deg)" }}
+        />
+        <div
+          className="absolute top-1/2 left-1/2 -mt-7 -ml-7 h-14 w-14"
+          style={{ transform: "rotateX(35deg) rotateY(45deg)" }}
+        >
+          {CUBE_FACES.map((t) => (
+            <span key={t} className="accent-face" style={{ transform: t }} />
+          ))}
+        </div>
+        <span
+          className="absolute top-1/2 left-1/2 h-2 w-2 bg-accent shadow-[0_0_10px_var(--accent)]"
+          style={{ transform: "translate3d(78px, -46px, 40px)" }}
+        />
+        <span
+          className="absolute top-1/2 left-1/2 h-1.5 w-1.5 bg-uv"
+          style={{ transform: "translate3d(-92px, 30px, -30px)" }}
+        />
+      </div>
+    </div>
   );
 }
 

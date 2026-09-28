@@ -7,7 +7,7 @@ import {
   type ComponentType,
   type ReactNode,
 } from "react";
-import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { useViewMode } from "@/lib/view-mode";
 import type { SculptureHandle } from "./sculpture-scene";
 import { canvasRect, findSculptureBox, scanStage, type Box, type Rect } from "./sculpture-layout";
 
@@ -86,8 +86,8 @@ export function Sculpture({
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
   const [inView, setInView] = useState(true);
-  const reduced = useMediaQuery("(prefers-reduced-motion: reduce)");
-  const wantLive = enabled && !reduced && !failed;
+  const { reducedMotion } = useViewMode();
+  const wantLive = enabled && !reducedMotion && !failed;
   const shownFocus = Math.max(focus, 0);
 
   // --- slot: measured after fonts load, and again whenever the stage or viewport resizes or

@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { uiStorage } from "./ui-storage";
 
 /**
@@ -66,6 +66,9 @@ function update(next: ExplorationState) {
   STEP_ORDER.filter((s) => isStepDone(state, s) && !isStepDone(before, s)).forEach((s) =>
     completions.forEach((c) => c(s)),
   );
+  // the visitor has just opened the last area: a one-off, visual-only completion cue
+  if (doneCount(before) < STEP_ORDER.length && doneCount(state) === STEP_ORDER.length)
+    window.dispatchEvent(new Event(EXPLORATION_COMPLETE_EVENT));
 }
 
 export const exploration = {
@@ -113,11 +116,40 @@ export function useExploration(): ExplorationState {
   return useSyncExternalStore(exploration.subscribe, exploration.get, () => EMPTY);
 }
 
+/**
+ * Fired once when a visitor action completes the last step (never for progress restored on
+ * load). It drives a short visual cue only: it marks the visitor's browsing, not a result.
+ */
+export const EXPLORATION_COMPLETE_EVENT = "portfolio:exploration-complete";
+
+/** True for `duration` ms after the visitor completes all four areas. */
+export function useCompletionCue(duration = 2400) {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    let timer: number | undefined;
+    const start = () => {
+      setOn(true);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setOn(false), duration);
+    };
+    window.addEventListener(EXPLORATION_COMPLETE_EVENT, start);
+    return () => {
+      window.removeEventListener(EXPLORATION_COMPLETE_EVENT, start);
+      window.clearTimeout(timer);
+    };
+  }, [duration]);
+  return on;
+}
+
 /** Fired by the explore panel's "Open both projects" action; Projects opens its details. */
 export const OPEN_PROJECTS_EVENT = "portfolio:open-projects";
 
-/** Brings the explore panel back and focuses its pill (the restoring control disappears). */
+/** Brings the explore panel back and focuses its visible trigger (the restoring control disappears). */
 export function restoreExplorePanel() {
   exploration.setDismissed(false);
-  requestAnimationFrame(() => document.getElementById("explore-pill")?.focus());
+  requestAnimationFrame(() =>
+    [...document.querySelectorAll<HTMLElement>(".explore-pill")]
+      .find((el) => el.getClientRects().length > 0)
+      ?.focus(),
+  );
 }

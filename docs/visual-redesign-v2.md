@@ -229,8 +229,14 @@ Replaces the §4 frames portal, which mostly hid behind the photo, and its SVG f
 **Slot search** (`hero/sculpture-layout.ts`):
 
 - The layout measures the real page: the name, role, kicker, actions and availability line boxes, the HUD, the caption pill, and the face and torso boxes (`data-face` / `data-subject` fractions of the photo).
-- It finds the largest upright elliptical footprint (1.6 : 1) in the first viewport that avoids them all, nearest the portrait's free edge at face height.
-- The search takes 1–11 ms and runs again on resize, after fonts load and when the photo decodes.
+- It places an upright elliptical footprint (1.6 : 1) that avoids them all, aligned to the portrait, between the header and the mobile dock:
+  - **Copy beside the photo** (from 1024 px, or landscape from 768 px): centred on the photo's inner edge (the seam with the copy) at the face line, within the photo's height. It keeps 1.6× the usual margin from the copy, with a size cap of 34 % of the photo's height. It gives up at most about 20 % of its size to stay on the alignment. It moves further onto the photo only when the copy runs close to the seam (1024×768).
+  - **Stacked** (phones, portrait tablets): inside the photo, in the top corner away from the face, with an even inset (max(12 px, 3 % of the photo's width)). It never runs past the screen edge.
+  - If the aligned slot cannot fit even the smallest size, it falls back to the largest free footprint nearest that position.
+- Measured offsets after the change:
+  - Seam and face line: 0–4 px at 1366, 1536, 1920, 2560 and 853×480; 12–28 px at 1280 and 1440, where the buttons limit it.
+  - Stacked insets: 21/21 px at 768 and 12/12 px at 390 and 320.
+- The search runs again on resize, after fonts load and when the photo decodes.
 - The canvas is sized to that slot plus a faded margin.
 
 **Hard guarantees**, drawn inside the renderer:
@@ -296,3 +302,95 @@ To regenerate after changing the scene: run `npx vite dev`, open the site, and i
 
 - **Frame rate:** headless software GL runs at about 12 fps at 1920, so the entrance takes longer there. No real GPU, real phone, Safari or Firefox was available.
 - **Other checks:** no Lighthouse or screen-reader pass.
+
+## 11. The page motion sequence (2026-09-28)
+
+This replaces the uniform treatment, where every section had the same title wipe and every block the same fade-up (`.reveal`, `.plane-rise`), with one connected sequence. Each section gets a motif (`SectionShell motif`):
+
+| Transition            | What happens                                                                                                                                                                                                                                                                                                                                                                                 | Driven by                                                       |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Hero → summary        | The planes, spills and drafting accents around the photo drift apart (`.geo-sep`, individual `translate`, so pointer depth still composes). The 3D sculpture comes apart again, the name column lifts and dims, and the portrait only recedes (scale 0.965, no fade). A light draws along the summary's rule and the summary rises.                                                          | stage view timeline; sculpture scroll progress                  |
+| Summary → experience  | A thin illuminated path draws down from the section's top edge (continuing the summary rule's line) into the role timeline, whose lit part follows reading progress. Each role's node and top rule light when its content reaches the reading line (60 % down), and reverse going back up. The featured role rises from depth, and a light sweeps its edge and its scope legend staggers in. | `--exp` view timeline; geometry on scroll (roles); `--featured` |
+| Experience → projects | The vertical path hands off to a horizontal plane along the Projects edge. Titles move to display size. Each project is a large presentation: its diagram sits on a real CSS 3D plane (back plate, card, front frame) that swings in and separates in depth, while the copy rises at its own rate.                                                                                           | `--proj`, per-figure `--pv`                                     |
+| Projects → skills     | Seven scattered clusters assemble into a capability constellation (security on the left arc, engineering on the right, one point per skill). It sits beside the readable HTML list and lights the selected category's cluster, and its points twinkle slowly only while on screen.                                                                                                           | `--cst`                                                         |
+| Skills → contact      | Credentials and Education are quiet: no header motion and no reveals. Contact is the finale: a display title, the email address set large, the actions and channels, and one CSS 3D accent (segmented rings around a faceted core). The accent folds into place, then turns once per 48 s, only while on screen.                                                                             | `--contact`                                                     |
+
+**Timing:** feedback 150 ms, reveals 450–700 ms or about 30–45 vh of scroll, ambient 30 s or more. Only `transform`, `translate`, `opacity`, `clip-path` (title wipes) and the diagrams' `stroke-dashoffset` animate. There is no pinning: the only sticky element is the role timeline inside its own column, which the page scrolls past normally. There are no spacer sections and no forced scroll speed.
+
+**Native scrolling:** Lenis (JS-smoothed wheel scrolling) was removed. The `lenis` package is still listed in `package.json`, unused.
+
+**Motion control:**
+
+- `html[data-motion="full" | "reduced"]` is set before first paint from the visitor's choice (the header **Motion** toggle at 1024 px and up, the mobile menu, and the command palette), or from the OS setting until they choose. The OS setting is followed live.
+- "Reduced" is a complete path: no animation, no transition, no smooth scrolling, no pointer depth, no heading scramble or magnetic buttons, and the 3D sculpture shows its static poster (its code isn't loaded).
+- Without JavaScript, CSS falls back to the OS setting alone.
+
+**Safety:**
+
+- **Content visible if animation fails:** every resting style is the final state, and hidden "from" states exist only while an animation runs. Role "pending" states are applied only after JavaScript has measured them.
+- **Reverse scrolling and resizing:** view timelines reverse with the scroll and recompute on resize.
+- **Deep links:** they resolve correctly. Role activation is measured from geometry, so a jump past a role still counts it.
+- **Reading position across rotation:** `useScrollAnchor` keeps the reader's place across width changes. Native scroll anchoring is suppressed by the animated transforms, and rotating a phone had moved the view 1.3–2.2 k px. Height-only changes (mobile toolbars) are left alone.
+
+**Verified** (production build, headless Chrome 153; script `motionverify`, all pass):
+
+- the Motion toggle stops all 115 animations and the 3D, persists, and restores
+- OS reduced motion gives 0 animations, with every section visible
+- with animations force-disabled, all text is visible in Experience, Projects, Skills and Contact
+- deep links to #experience, #role-konstent, #projects, #skills and #contact resolve fully visible
+- reverse scrolling returns role states and the hand-off
+- resizing and a mobile toolbar height change cause no overflow
+- a phone rotation keeps the section within 10 px
+- no horizontal overflow over a full scroll at 320, 390, 768, 1024, 1440 and 1920 px
+- CLS 0.0009 over a full down-and-up scroll
+- no console errors
+
+Scroll journeys (14 stops each) were inspected at 1440×900 and 390×844. The sculpture, fallback, portrait and link suites still pass.
+
+**Not verified:**
+
+- Firefox: no scroll-driven animations there without a flag, so it shows the static, complete page plus the JavaScript role activation.
+- Safari 26, real devices, and frame rate on real GPUs.
+
+## 12. Interactive skills constellation (2026-09-28)
+
+- **One control for everything.** WAI-ARIA tabs for the seven resume categories. Arrow keys work in both directions, plus Home/End, with wrap-around. On phones and tablets the tabs are a two-column grid of 48–54 px touch targets above the list; from 1024 px they form a column beside it.
+- **Exact lists.** The selected category's complete skill list is always shown in HTML, exactly as in `resume.ts`. "Show all skills" and Reading mode list all 7 categories and 54 skills.
+- **Constellation.** Selecting a category lights its cluster. Clicking or tapping a cluster selects that category too; each cluster has a 62-unit touch area. Hovering a skill with a mouse lights its exact point and names it. The drawing stays `aria-hidden` with no tab stops: the tabs are the keyboard and screen-reader path.
+- **No proficiency cues.** Every point and node is one size, emphasised only by selection. There are no scores, levels or weighting.
+- **Assembly.** The map is assembled by the time 60 % of it is on screen. View timelines exclude the page's scroll padding, so a deep link to #skills lands on the finished map.
+- **Verified** (script `skillsverify`, 1440 / 768 / 390, all pass):
+  - tab semantics and sizes
+  - keyboard sequence
+  - every category's panel matching its complete reference list
+  - the constellation following the selection
+  - cluster click and tap
+  - hover-lit points
+  - equal point sizes
+  - show-all round trip
+  - Reading mode
+  - no overflow and no console errors
+- **Also re-run:** the motion suite passes. The PDF audit finds all 61 skill items; its overall 148/149 is the separate role-line change in commit 99ea769.
+
+## 13. Interaction layer (2026-09-28)
+
+- **Navigation dock.**
+  - Desktop: the section rail's single indicator glides to the active section (450 ms). Labels show on hover and on keyboard focus. Two tools are always there: Reading mode (`aria-pressed`) and email.
+  - Phones: a bottom dock shows the current section, with a lit segment gliding along seven. It has Email, Reading and Commands, all 44 px. The explore pill sits above it, and the page reserves `--dock-h` so nothing is covered.
+  - Section links stay in the header and menu.
+- **Magnetic attraction.** Primary buttons only. The label drifts at most 4 px toward a mouse on fine pointers with motion on; the clickable box never moves.
+- **Press and light.**
+  - Every button, tab, disclosure and dock tool has a press state (scale 0.95–0.97).
+  - Primary and secondary buttons have a directional light that follows the pointer. It is centred on keyboard focus and appears at the point of a tap on touch. It replaces the hover-only sweep.
+- **Project depth.** The diagram's plane tilts up to about 3° toward a mouse and lifts slightly on hover. Keyboard focus inside the project, or a tap on its buttons, lifts it the same way. It is flat with motion off or in Reading mode.
+- **Command palette.** It has a visible trigger (header, and the mobile dock) and opens with Ctrl/⌘ K or `/`. Shortcuts never fire while typing, and the keyboard hints are shown in the dialog.
+- **Exploration.** The same four optional steps: experience viewed, both projects opened, skills explored, credentials viewed. When the last one is done, a one-off, visual-only cue plays:
+  - a light runs down the rail (or across the dock)
+  - the explore pill rings twice
+  - the progress segments light in sequence
+
+  The text stays "You have opened all four areas." The cue never replays on reload and is absent with motion off.
+
+- **Reading mode.** It is reachable from the header, the rail, the mobile dock, a second skip link and the palette. The default stays Interactive (fresh visits, OS reduced motion and no WebGL were all checked).
+- **Not added.** No custom cursor or pointer-follower, no audio, no tutorial, nothing gated.
+- **Verified** (script `interactverify`, all 17 checks pass at 1440 and 390 px). The motion, skills, sculpture, portrait and link suites still pass.

@@ -5,6 +5,24 @@
 @custom-variant dark (&:is(.dark *));
 /* `reading:` follows <html data-view>, which is set before first paint */
 @custom-variant reading (&:where([data-view="reading"] *));
+/* hero composition: side by side from 1024px, or on landscape tablets from 768px; phones
+   and portrait tablets stack (portrait first), so name, role and actions fit the first screen */
+/* (block form: a comma-separated query list here compiles to its first branch only) */
+@custom-variant split {
+  @media (min-width: 48rem) and (orientation: landscape) {
+    @slot;
+  }
+  @media (min-width: 64rem) {
+    @slot;
+  }
+}
+/* the hero's desktop refinements: declared after `split` so they take precedence over it
+   (custom variants are emitted after the built-in lg/xl, in declaration order) */
+@custom-variant wide (@media (min-width: 64rem));
+@custom-variant wider (@media (min-width: 80rem));
+/* short landscape screens (phones on their side, 853×480): tighter vertical rhythm so the
+   actions clear the mobile dock */
+@custom-variant short (@media (max-height: 36rem) and (orientation: landscape));
 
 /*
  * Design tokens — v2 "The Security Architect" (docs/visual-redesign-v2.md).
@@ -191,20 +209,31 @@ html[data-view="reading"] .dg-flow {
   animation: none;
 }
 
+/*
+ * Motion off: <html data-motion="reduced"> — the visitor's choice (header "Motion" control,
+ * command palette) or, until they choose, the OS setting; set before first paint
+ * (view-mode.ts). No animation, no transition, no smooth scrolling, anywhere. Content
+ * never depends on an animation to become visible, so this is always a complete page.
+ */
+html[data-motion="reduced"] {
+  scroll-behavior: auto;
+}
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+/* without JavaScript nothing sets data-motion: follow the OS setting alone */
 @media (prefers-reduced-motion: reduce) {
-  /* the global 0.001ms rule below would make an infinite loop flicker, so stop it outright */
-  .dg-flow {
-    animation: none;
-  }
-
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.001ms !important;
-    transition-duration: 0.001ms !important;
-  }
-  html {
+  html:not([data-motion]) {
     scroll-behavior: auto;
+  }
+  html:not([data-motion]) *,
+  html:not([data-motion]) *::before,
+  html:not([data-motion]) *::after {
+    animation: none !important;
+    transition: none !important;
   }
 }
 
@@ -263,27 +292,9 @@ html[data-view="reading"] .dg-flow {
 }
 
 /*
- * <Reveal>: CSS-only entrance. Visible by default — the animation's own fill provides the
- * hidden "from" state, so anything that stops the animation (Reading mode, reduced motion,
- * print, unsupported CSS, failed JS) leaves content visible.
- */
-@keyframes reveal-up {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-html:not([data-view="reading"]) .reveal {
-  animation: reveal-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: var(--reveal-delay, 0ms);
-}
-/*
- * Hero: movement only, never transparent — the name and role line are the page's
- * largest paint and must be readable at first paint (LCP), on every engine.
+ * <Reveal> (hero only): a short load-time rise, movement only and never transparent — the
+ * name and role line are the page's largest paint and must be readable at first paint.
+ * Sections below have their own scroll-linked motifs (see the motion sequence).
  */
 @keyframes reveal-rise {
   from {
@@ -293,24 +304,9 @@ html:not([data-view="reading"]) .reveal {
     transform: none;
   }
 }
-html:not([data-view="reading"]) #overview .reveal {
-  animation-name: reveal-rise;
-}
-/* scroll-driven where supported; the hero keeps its short load-time stagger */
-@supports (animation-timeline: view()) {
-  html:not([data-view="reading"]) main > section:not(#overview) .reveal {
-    animation-duration: auto;
-    animation-delay: 0s;
-    animation-timing-function: linear;
-    animation-timeline: view();
-    /* fixed distance: a tall card is fully legible after 25vh of scroll, not near the top */
-    animation-range: entry 0% entry 25vh;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .reveal {
-    animation: none !important;
-  }
+html:not([data-view="reading"]) .reveal {
+  animation: reveal-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--reveal-delay, 0ms);
 }
 @media print {
   .reveal {
@@ -412,13 +408,14 @@ html:not([data-view="reading"]) #overview .reveal {
     0
   );
 }
-@media (prefers-reduced-motion: reduce) {
-  .depth {
-    transform: none;
-  }
-}
+html[data-motion="reduced"] .depth,
 html[data-view="reading"] .depth {
   transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion]) .depth {
+    transform: none;
+  }
 }
 
 /* Outlined numeral behind section titles */
@@ -427,44 +424,97 @@ html[data-view="reading"] .depth {
   -webkit-text-stroke: 1px color-mix(in oklab, var(--text) 18%, transparent);
 }
 
-/* Primary action: a light sweep on hover (mouse devices only) and a press state */
-.btn-sweep {
-  background-image: linear-gradient(
-    110deg,
-    transparent 30%,
-    color-mix(in oklab, white 55%, transparent) 50%,
-    transparent 70%
-  );
-  background-size: 250% 100%;
-  background-position: 150% 0;
-  background-repeat: no-repeat;
-}
-@media (hover: hover) and (pointer: fine) {
-  .btn-sweep:hover {
-    background-position: -50% 0;
-    transition:
-      background-position 700ms cubic-bezier(0.22, 1, 0.36, 1),
-      background-color 150ms,
-      transform 150ms;
-  }
+/* ======================================================================
+ * Page motion sequence (docs/visual-redesign-v2.md §11)
+ *
+ * One connected sequence instead of the same fade on every section:
+ *   hero → summary: the geometry around the portrait separates, the identity lifts
+ *   summary → experience: an illuminated path draws down into the role timeline
+ *   experience → projects: the vertical path hands off to a horizontal plane; projects
+ *     arrive as layered 3D presentations
+ *   projects → skills: scattered forms assemble into a capability constellation
+ *   skills → contact: quiet sections, then one strong composition with one 3D accent
+ *
+ * Rules: native scrolling only, no pinning. Scroll-linked motion uses view timelines
+ * (reverses with the scroll, recomputes on resize, resolves correctly on deep links).
+ * Only transform, translate/scale/rotate and opacity animate. Every element's resting
+ * style is its final state; a hidden "from" state exists only while an animation runs,
+ * so no animation (unsupported engine, Reading mode, motion off, print) = full content.
+ * Durations: feedback 150ms, reveals 450–700ms or ~30–45vh of scroll, ambient 30s+.
+ * ==================================================================== */
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-feedback: 150ms;
+  --dur-reveal: 600ms;
 }
 
-/* ---- cinematic scroll (Chromium/Safari 26+; elsewhere content simply sits still) ---- */
+/* named view timelines (descendants animate against their section) */
+[data-stage] {
+  view-timeline: --stage block;
+}
+#experience {
+  view-timeline: --exp block;
+}
+#projects {
+  view-timeline: --proj block;
+}
+#contact {
+  view-timeline: --contact block;
+}
+.summary-seq {
+  view-timeline: --summary block;
+}
+.featured-timeline {
+  view-timeline: --featured block;
+}
+
+/* ---------- keyframes ---------------------------------------------------- */
 @keyframes stage-portrait-exit {
+  /* the portrait only recedes: it never fades, so it stays readable throughout */
   to {
-    transform: translateY(-6%) scale(0.9);
-    opacity: 0.35;
+    transform: translateY(-3%) scale(0.965);
   }
 }
 @keyframes stage-copy-exit {
   to {
-    transform: translateY(-14%);
-    opacity: 0.35;
+    transform: translateY(-10%);
+    opacity: 0.4;
   }
 }
 @keyframes stage-light-exit {
   to {
-    opacity: 0.2;
+    opacity: 0.25;
+  }
+}
+@keyframes geo-separate {
+  to {
+    translate: var(--sep-x, 0) var(--sep-y, 0);
+  }
+}
+@keyframes draw-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes draw-y {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes rise {
+  from {
+    transform: translateY(var(--rise, 40px));
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
   }
 }
 @keyframes title-wipe {
@@ -485,9 +535,9 @@ html[data-view="reading"] .depth {
     opacity: 1;
   }
 }
-@keyframes plane-rise {
+@keyframes featured-in {
   from {
-    transform: perspective(1400px) translateY(56px) rotateX(9deg);
+    transform: perspective(1600px) translateY(72px) rotateX(10deg) scale(0.96);
     opacity: 0;
   }
   to {
@@ -495,46 +545,572 @@ html[data-view="reading"] .depth {
     opacity: 1;
   }
 }
+@keyframes proj-rig-in {
+  from {
+    transform: rotateY(calc(var(--ry) * 3.2)) rotateX(16deg) translateY(90px);
+    opacity: 0;
+  }
+  to {
+    transform: rotateY(var(--ry)) rotateX(4deg);
+    opacity: 1;
+  }
+}
+@keyframes proj-plate-in {
+  from {
+    transform: translateZ(0);
+  }
+  to {
+    transform: translate3d(var(--plate-x), 28px, -90px);
+  }
+}
+@keyframes proj-frame-in {
+  from {
+    transform: translateZ(0);
+    opacity: 0;
+  }
+  to {
+    transform: translateZ(70px);
+    opacity: 1;
+  }
+}
+@keyframes cst-assemble {
+  from {
+    transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0.55);
+    opacity: 0.15;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes cst-twinkle {
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes accent-ring-in {
+  from {
+    transform: rotateX(0deg) rotateY(0deg) scale(0.55);
+    opacity: 0;
+  }
+}
+@keyframes accent-spin {
+  to {
+    transform: rotateX(-16deg) rotateY(360deg);
+  }
+}
+
+/* ---------- resting styles (the final state; valid with no animation) --------- */
+
+/* experience path: a hairline with an illuminated core that grows along it */
+.path-line {
+  position: absolute;
+  width: 1px;
+  background: var(--line);
+}
+.path-glow {
+  position: absolute;
+  inset: 0 -0.5px;
+  transform-origin: top;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--accent) 20%, transparent),
+    var(--accent) 35%,
+    var(--accent)
+  );
+  box-shadow: 0 0 10px 1px color-mix(in oklab, var(--accent) 55%, transparent);
+}
+.rule-glow {
+  position: absolute;
+  height: 1px;
+  transform-origin: left;
+  background: linear-gradient(
+    to right,
+    var(--accent),
+    color-mix(in oklab, var(--accent) 15%, transparent)
+  );
+  box-shadow: 0 0 10px 1px color-mix(in oklab, var(--accent) 45%, transparent);
+}
+
+/* role activation (JS sets data-activation only once it knows; no JS = active look) */
+.role-rule {
+  transform-origin: left;
+  transition: transform 700ms var(--ease-out);
+}
+.role-head {
+  transition:
+    transform var(--dur-reveal) var(--ease-out),
+    opacity var(--dur-reveal) var(--ease-out);
+}
+[data-activation="pending"] .role-rule {
+  transform: scaleX(0);
+}
+[data-activation="pending"] .role-head {
+  transform: translateX(-14px);
+  opacity: 0.55;
+}
+.role-node {
+  transition:
+    background-color 300ms,
+    box-shadow 300ms,
+    transform 300ms var(--ease-out);
+}
+
+/* projects: a layered presentation plane (real CSS 3D; flattened in Reading mode) */
+.proj-visual {
+  perspective: 1600px;
+}
+.proj-rig {
+  --ry: -7deg;
+  transform-style: preserve-3d;
+  transform: rotateY(var(--ry)) rotateX(4deg);
+}
+.proj-flip .proj-rig {
+  --ry: 7deg;
+}
+.proj-plate {
+  --plate-x: 28px;
+  transform: translate3d(var(--plate-x), 28px, -90px);
+}
+.proj-flip .proj-plate {
+  --plate-x: -28px;
+}
+.proj-frame {
+  transform: translateZ(70px);
+}
+html[data-view="reading"] .proj-rig,
+html[data-view="reading"] .proj-plate,
+html[data-view="reading"] .proj-frame {
+  transform: none;
+}
+
+/* capability constellation */
+.cst-group {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.cst-dot {
+  animation: cst-twinkle 6s ease-in-out infinite;
+  animation-delay: calc(var(--i) * -0.73s);
+  animation-play-state: paused;
+}
+[data-inview] .cst-dot {
+  animation-play-state: running;
+}
+/* clusters are a pointer shortcut to the category tabs */
+.cst-pick {
+  cursor: pointer;
+}
+.cst-pick:hover [data-part="node"] {
+  stroke: var(--accent);
+}
+.cst-pick:hover [data-part="label"] {
+  fill: var(--text);
+}
+.cst-lit-label {
+  font-weight: 600;
+}
+.cst-group [data-part] {
+  transition:
+    fill 300ms,
+    stroke 300ms,
+    opacity 300ms;
+}
+
+.cst-label {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  letter-spacing: 0.02em;
+}
+.cst-tier {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  fill: var(--muted);
+}
+.cst-hub {
+  font-family: var(--font-sans);
+  font-size: 18px;
+  font-weight: 600;
+}
+/* labels would render below ~9px on narrow screens; the HTML list just below names them.
+   Without labels the drawing's label margins are empty, so crop them: the map fills the
+   width (the section clips horizontally) instead of sitting small in the middle. */
+@media (max-width: 40rem) {
+  .cst-label,
+  .cst-tier {
+    display: none;
+  }
+  .cst {
+    overflow: hidden;
+  }
+  .cst svg {
+    width: 150%;
+    margin-inline: -25%;
+    margin-block: -9% -14%;
+  }
+}
+
+/* contact accent: one controlled CSS 3D object */
+.accent-3d {
+  perspective: 900px;
+}
+.accent-rig {
+  transform-style: preserve-3d;
+  transform: rotateX(-16deg);
+  animation: accent-spin 48s linear infinite;
+  animation-play-state: paused;
+}
+[data-inview] .accent-rig {
+  animation-play-state: running;
+}
+.accent-rig > * {
+  transform-style: preserve-3d;
+}
+.accent-ring {
+  border-radius: 9999px;
+  border: 2px solid color-mix(in oklab, var(--accent) 75%, transparent);
+  -webkit-mask: repeating-conic-gradient(#000 0 26deg, transparent 26deg 32deg);
+  mask: repeating-conic-gradient(#000 0 26deg, transparent 26deg 32deg);
+}
+.accent-face {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #5c6875, #1a2029 70%);
+  border: 1px solid color-mix(in oklab, var(--accent) 55%, transparent);
+  backface-visibility: visible;
+}
+
+/* ---------- scroll-linked sequence (Chromium, Safari 26+; elsewhere content is static) --- */
 @supports (animation-timeline: view()) {
+  /* hero → summary */
   html:not([data-view="reading"]) .stage-exit-portrait {
     animation: stage-portrait-exit linear both;
-    animation-timeline: view();
+    animation-timeline: --stage;
     animation-range: exit 0% exit 100%;
   }
   html:not([data-view="reading"]) .stage-exit-copy {
     animation: stage-copy-exit linear both;
-    animation-timeline: view();
+    animation-timeline: --stage;
     animation-range: exit 0% exit 100%;
   }
   html:not([data-view="reading"]) .stage-exit-light {
     animation: stage-light-exit linear both;
-    animation-timeline: view();
+    animation-timeline: --stage;
     animation-range: exit 0% exit 100%;
+  }
+  html:not([data-view="reading"]) .geo-sep {
+    animation: geo-separate linear both;
+    animation-timeline: --stage;
+    animation-range: exit 5% exit 70%;
+  }
+  html:not([data-view="reading"]) .summary-rule {
+    animation: draw-x linear both;
+    animation-timeline: --summary;
+    animation-range: entry 0% entry 240px;
+  }
+  html:not([data-view="reading"]) .summary-rise {
+    animation: rise linear both;
+    animation-timeline: --summary;
+    animation-range: entry calc(40px + var(--i, 0) * 60px) entry calc(280px + var(--i, 0) * 60px);
+  }
+
+  /* section headers: numeral + title, per motif */
+  html:not([data-view="reading"]) .numeral-slide {
+    animation: numeral-slide linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 35%;
   }
   html:not([data-view="reading"]) .title-wipe {
     animation: title-wipe linear both;
     animation-timeline: view();
     animation-range: entry 10% cover 30%;
   }
-  html:not([data-view="reading"]) .numeral-slide {
-    animation: numeral-slide linear both;
+  html:not([data-view="reading"]) .title-rise {
+    --rise: 0.45em;
+    animation: rise linear both;
     animation-timeline: view();
-    animation-range: entry 0% cover 35%;
+    animation-range: entry 0% entry 100%;
   }
-  html:not([data-view="reading"]) .plane-rise {
-    animation: plane-rise linear both;
+
+  /* summary → experience: the path draws down into the timeline */
+  html:not([data-view="reading"]) .exp-lead .path-glow {
+    animation: draw-y linear both;
+    animation-timeline: --exp;
+    animation-range: entry 0% entry 55%;
+  }
+  html:not([data-view="reading"]) .exp-track .path-glow {
+    animation: draw-y linear both;
+    animation-timeline: --exp;
+    animation-range: contain 0% contain 100%;
+  }
+  html:not([data-view="reading"]) .featured-in {
+    animation: featured-in linear both;
+    animation-timeline: --featured;
+    animation-range: entry 0% entry 45vh;
+  }
+  html:not([data-view="reading"]) .featured-sweep {
+    animation: draw-x linear both;
+    animation-timeline: --featured;
+    animation-range: entry 15vh entry 60vh;
+  }
+  html:not([data-view="reading"]) .featured-scope > * {
+    --rise: 24px;
+    animation: rise linear both;
+    animation-timeline: --featured;
+    animation-range: entry calc(20vh + var(--i, 0) * 6vh) entry calc(45vh + var(--i, 0) * 6vh);
+  }
+
+  /* experience → projects: vertical path hands off to a horizontal plane */
+  html:not([data-view="reading"]) .proj-handoff {
+    animation: draw-x linear both;
+    animation-timeline: --proj;
+    animation-range: entry 0% entry 60%;
+  }
+  html:not([data-view="reading"]) .proj-visual {
+    view-timeline: --pv block;
+  }
+  html:not([data-view="reading"]) .proj-rig {
+    animation: proj-rig-in linear both;
+    animation-timeline: --pv;
+    animation-range: entry 0% entry 70vh;
+  }
+  html:not([data-view="reading"]) .proj-plate {
+    animation: proj-plate-in linear both;
+    animation-timeline: --pv;
+    animation-range: entry 20vh entry 80vh;
+  }
+  html:not([data-view="reading"]) .proj-frame {
+    animation: proj-frame-in linear both;
+    animation-timeline: --pv;
+    animation-range: entry 30vh entry 85vh;
+  }
+  html:not([data-view="reading"]) .proj-copy {
+    --rise: 64px;
+    animation: rise linear both;
     animation-timeline: view();
-    /* fixed distance, so a tall section settles as quickly as a short one */
-    animation-range: entry 0% entry 30vh;
+    animation-range: entry 0% entry 40vh;
+  }
+
+  /* projects → skills: the constellation assembles */
+  html:not([data-view="reading"]) .cst {
+    view-timeline: --cst block;
+  }
+  html:not([data-view="reading"]) .cst-group {
+    animation: cst-assemble linear both;
+    animation-timeline: --cst;
+    /* assembled once 60% of the map is on screen (view timelines exclude the page's
+       scroll padding), so a deep link to #skills lands on the finished map even when its
+       lower edge sits below the fold */
+    animation-range: entry 0% entry 60%;
+  }
+  html:not([data-view="reading"]) .cst-links {
+    animation: fade-in linear both;
+    animation-timeline: --cst;
+    animation-range: entry 35% entry 60%;
+  }
+
+  /* skills → contact: one composition, one accent */
+  html:not([data-view="reading"]) .finale-rise {
+    --rise: 48px;
+    animation: rise linear both;
+    animation-timeline: --contact;
+    animation-range: entry 0% entry 40vh;
+  }
+  html:not([data-view="reading"]) .accent-ring {
+    animation: accent-ring-in linear both;
+    animation-timeline: --contact;
+    animation-range: entry 20% cover 45%;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .stage-exit-portrait,
-  .stage-exit-copy,
-  .stage-exit-light,
-  .title-wipe,
-  .numeral-slide,
-  .plane-rise {
-    animation: none !important;
+
+/* ======================================================================
+ * Interaction layer (docs/visual-redesign-v2.md §13)
+ * Feedback 150ms, indicators ~450ms, the completion cue ~2s once. Every effect has a
+ * focus or tap equivalent, and all of it stops with motion off or in Reading mode (the
+ * global rules above); nothing here gates content or changes the system cursor.
+ * ==================================================================== */
+
+/* the mobile dock's height (its content row + segment track + the home-indicator inset) */
+:root {
+  --dock-h: calc(3.625rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 64rem) {
+  :root {
+    --dock-h: 0px;
   }
+}
+@media (max-width: 63.999rem) {
+  html {
+    /* focused elements stay clear of the dock and the explore pill above it */
+    scroll-padding-bottom: calc(var(--dock-h) + 4.5rem);
+  }
+}
+
+/* ---- navigation dock: one indicator glides to the active section ---- */
+.dock-indicator {
+  background: var(--accent);
+  box-shadow: 0 0 10px 1px color-mix(in oklab, var(--accent) 60%, transparent);
+  /* 2.75rem item + 0.25rem gap per step */
+  transform: translateY(calc(var(--active, 0) * 3rem));
+  transition: transform 450ms var(--ease-out);
+}
+.dock-segment {
+  background: var(--accent);
+  box-shadow: 0 0 8px color-mix(in oklab, var(--accent) 70%, transparent);
+  transform: translateX(calc(var(--active, 0) * 100%));
+  transition: transform 450ms var(--ease-out);
+}
+@keyframes dock-label-in {
+  from {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+}
+.dock-label {
+  animation: dock-label-in 260ms var(--ease-out);
+}
+
+/* ---- completion cue (visual only, once): light runs down the rail / across the dock,
+        the explore pill rings twice, the progress segments light in sequence ---- */
+@keyframes dock-trace {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  85% {
+    transform: translateY(18rem);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(18rem);
+    opacity: 0;
+  }
+}
+.dock-trace {
+  background: linear-gradient(to bottom, transparent, var(--accent), transparent);
+  box-shadow: 0 0 14px 2px color-mix(in oklab, var(--accent) 55%, transparent);
+  animation: dock-trace 1.6s var(--ease-out) forwards;
+}
+@keyframes dock-sweep {
+  from {
+    transform: scaleX(0);
+    opacity: 1;
+  }
+  70% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 0;
+  }
+}
+.dock-sweep {
+  transform-origin: left;
+  background: linear-gradient(to right, transparent, var(--accent));
+  animation: dock-sweep 1.4s var(--ease-out) forwards;
+}
+@keyframes pill-ring {
+  from {
+    box-shadow:
+      0 10px 30px -10px rgb(0 0 0 / 0.7),
+      0 0 0 0 color-mix(in oklab, var(--accent) 55%, transparent);
+  }
+  to {
+    box-shadow:
+      0 10px 30px -10px rgb(0 0 0 / 0.7),
+      0 0 0 14px transparent;
+  }
+}
+.explore-pill[data-cue] {
+  border-color: var(--accent);
+  animation: pill-ring 1.1s var(--ease-out) 2;
+}
+@keyframes seg-light {
+  50% {
+    box-shadow: 0 0 10px 1px var(--accent);
+    transform: scaleY(1.8);
+  }
+}
+[data-cue] .explore-seg {
+  animation: seg-light 600ms var(--ease-out) both;
+  animation-delay: calc(var(--i) * 120ms);
+}
+/* with motion off the cue is simply absent (the state change itself is enough) */
+html[data-motion="reduced"] .dock-trace,
+html[data-motion="reduced"] .dock-sweep,
+html[data-view="reading"] .dock-trace,
+html[data-view="reading"] .dock-sweep {
+  display: none;
+}
+
+/* ---- buttons: tactile press + a controlled directional light ---- */
+.magnet-content {
+  transition: transform 300ms var(--ease-out);
+}
+.btn-light {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  --light: color-mix(in oklab, var(--accent) 24%, transparent);
+}
+.btn-light-strong {
+  --light: color-mix(in oklab, white 50%, transparent);
+}
+.btn-light::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  /* follows the pointer (--mx/--my from MagneticButton), centred for keyboard focus */
+  background: radial-gradient(
+    5.5rem circle at var(--mx, 50%) var(--my, 50%),
+    var(--light),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 150ms;
+}
+@media (hover: hover) {
+  .btn-light:hover::after {
+    opacity: 1;
+  }
+}
+.btn-light:focus-visible::after,
+.btn-light:active::after {
+  opacity: 1;
+}
+
+/* ---- project visuals: a subtle depth response on the selected (hovered/focused) one ---- */
+.proj-tilt {
+  transform-style: preserve-3d;
+  transform: rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  transition: transform 500ms var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .proj-visual:hover .proj-tilt {
+    transform: rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)) translateZ(22px);
+  }
+}
+/* keyboard (and a tap on the project's links or details button) lifts it the same way */
+.proj-article:focus-within .proj-tilt {
+  transform: rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)) translateZ(22px);
+}
+html[data-motion="reduced"] .proj-tilt,
+html[data-view="reading"] .proj-tilt {
+  transform: none;
 }

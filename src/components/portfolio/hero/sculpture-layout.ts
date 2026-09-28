@@ -4,10 +4,12 @@
  * Obstacles are marked in the DOM: `data-sculpture-avoid="text"` (the text's own line
  * boxes), `"children"` (each child element's box) or `"box"` (the element's box), plus the
  * face and the torso inside the portrait (`img[data-face]`, `data-subject`: fractions of the
- * image). The sculpture box is
- * the largest upright elliptical footprint (height = 1.6 × width) inside the first viewport
- * of the stage that touches none of them, placed as close as possible to the portrait's
- * free edge at face height. Everything here is in stage-local CSS pixels.
+ * image). The sculpture box is an upright elliptical footprint (height = 1.6 × width) that
+ * touches none of them, aligned to the portrait: centred on its inner edge (the seam with the
+ * copy) at face height when the copy sits beside it, or set into its free corner with an even
+ * inset when the page stacks. It is as large as that aligned slot allows, within a cap
+ * relative to the portrait, and always inside the first viewport between the header and the
+ * mobile dock. Everything here is in stage-local CSS pixels.
  */
 
 export type Rect = { x: number; y: number; w: number; h: number };
@@ -104,8 +106,11 @@ export type Scan = {
   photo: Rect | null;
 };
 
-/** Everything the sculpture must stay clear of, padded, in stage-local px. */
-export function scanStage(stage: HTMLElement, pad = 1): Scan {
+/**
+ * Everything the sculpture must stay clear of, padded, in stage-local px. `copyGap` scales
+ * the padding around the copy and controls only (not the face) for extra breathing room.
+ */
+export function scanStage(stage: HTMLElement, pad = 1, copyGap = 1): Scan {
   const o = stage.getBoundingClientRect();
   const obstacles: Rect[] = [];
   const img = stage.querySelector<HTMLImageElement>("img[data-face]");
@@ -126,29 +131,50 @@ export function scanStage(stage: HTMLElement, pad = 1): Scan {
         : mode === "children"
           ? [...el.children].filter(visible).map((c) => toLocal(c.getBoundingClientRect(), o))
           : [toLocal(el.getBoundingClientRect(), o)];
-    for (const r of rects) obstacles.push(inflate(r, (PAD[mode] ?? PAD.box) * pad));
+    for (const r of rects) obstacles.push(inflate(r, (PAD[mode] ?? PAD.box) * pad * copyGap));
   });
   const anchor = stage.querySelector("[data-stage-anchor]");
   const photo = anchor ? toLocal(anchor.getBoundingClientRect(), o) : null;
   return { obstacles, face, subject, photo };
 }
 
-/** Largest free sculpture box in the stage's first viewport, nearest the portrait's free edge. */
+/**
+ * The sculpture slot, aligned to the portrait (see the top of this file): the largest box
+ * that fits near the aligned position. If even the smallest one does not fit there, the
+ * largest free box nearest the portrait's inner edge instead.
+ */
 export function findSculptureBox(stage: HTMLElement): Box | null {
   const o = stage.getBoundingClientRect();
-  const scan = scanStage(stage);
-  const { face, photo } = scan;
+  const first = scanStage(stage);
+  const photo = first.photo;
+  // side by side: the portrait starts well into the stage, with the copy to its left
+  const side = !!photo && photo.x > o.width * 0.25;
+  // beside the copy, keep a wider margin from it so the two never look crowded
+  const scan = side ? scanStage(stage, 1, 1.6) : first;
+  const { face } = scan;
   const obstacles = scan.subject ? [...scan.obstacles, scan.subject] : scan.obstacles;
   const header = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
-  const top = Math.max(0, header - o.top) + 12;
-  const bottom = Math.min(o.height, window.innerHeight - o.top) - 12;
+  const dock = document.querySelector("nav.mobile-dock");
+  const floor =
+    dock && dock.getClientRects().length ? dock.getBoundingClientRect().top : window.innerHeight;
+  const top = Math.max(0, header - o.top) + 16;
+  const bottom = Math.min(o.height, floor - o.top) - 16;
   if (bottom - top < 160) return null;
-  const narrow = window.innerWidth < 768;
-  const step = 6;
+
+  // bounds: on screen; beside the copy, within the portrait's height; when the page stacks,
+  // inside the portrait with an even inset
+  const inset = photo ? Math.max(12, photo.w * 0.03) : 12;
+  const inPhoto = !side && !!photo;
+  const x0 = inPhoto ? photo.x + inset : 8;
+  const x1 = inPhoto ? photo.x + photo.w - inset : o.width - 8;
+  const y0 = inPhoto ? Math.max(top, photo.y + inset) : photo ? Math.max(top, photo.y) : top;
+  const y1 = inPhoto ? Math.min(bottom, photo.y + photo.h - inset) : bottom;
+  if (y1 - y0 < 160) return null;
 
   // the silhouette is roughly elliptical: test an ellipse (inflated so ring tips and
   // parts near its corners stay clear too) against each obstacle's nearest point
   const fits = (cx: number, cy: number, rx: number, ry: number) => {
+    if (cx - rx < x0 || cx + rx > x1 || cy - ry < y0 || cy + ry > y1) return false;
     const ex = rx * ELLIPSE_INFLATE;
     const ey = ry * ELLIPSE_INFLATE;
     for (const r of obstacles) {
@@ -158,22 +184,81 @@ export function findSculptureBox(stage: HTMLElement): Box | null {
     }
     return true;
   };
-  // on phones the sculpture may run a little past the screen edge beside the photo
+
+  // aligned position: beside the copy, centred on the seam at the face line (clamped into
+  // the bounds); stacked, in the portrait's top corner away from the face
+  const faceCx = face ? face.x + face.w / 2 : o.width / 2;
+  const faceCy = face ? face.y + face.h / 2 : (y0 + y1) / 2;
+  const freeRight = !!photo && faceCx < photo.x + photo.w / 2;
+  // the fitting box of height 2·ry nearest the aligned position, and how far off it is
+  // (in radii). `drift` is how far it may move onto the photo beside the copy.
+  const aligned = (ry: number, drift: number) => {
+    const rx = ry / SLOT.aspect;
+    const ax = !photo ? o.width / 2 : side ? photo.x : freeRight ? x1 - rx : x0 + rx;
+    const ay = side || !photo ? Math.min(Math.max(faceCy, y0 + ry), y1 - ry) : y0 + ry;
+    const [dx0, dx1] = side ? [-0.15 * rx, drift * rx] : [-0.35 * rx, 0.35 * rx];
+    // beside the copy it holds the face line closely (it shrinks rather than drifting up
+    // against the header); in the stacked portrait's corner it may move more
+    const wy = ry * (side ? 0.12 : 0.4);
+    let best: { box: Box; d: number } | null = null;
+    for (let j = Math.ceil(-wy / 4); j * 4 <= wy; j++)
+      for (let i = Math.ceil(dx0 / 4); i * 4 <= dx1; i++) {
+        const dx = i * 4;
+        const dy = j * 4;
+        if (!fits(ax + dx, ay + dy, rx, ry)) continue;
+        const d = (dx / rx) ** 2 + (dy / ry) ** 2;
+        if (!best || d < best.d) best = { box: { cx: ax + dx, cy: ay + dy, rx, ry }, d };
+      }
+    return best;
+  };
+  const cap = Math.min(photo ? photo.h * (side ? 0.34 : 0.42) : Infinity, (y1 - y0) / 2);
+  const largest = (drift: number): Box | null => {
+    let lo = 48;
+    let hi = cap;
+    if (lo > hi || !aligned(lo, drift)) return null;
+    for (let i = 0; i < 10 && hi - lo > 2; i++) {
+      const mid = (lo + hi) / 2;
+      if (aligned(mid, drift)) lo = mid;
+      else hi = mid;
+    }
+    // give up a little size (at most ~20 %) where that brings it closer to the alignment
+    let best: Box | null = null;
+    let bestScore = Infinity;
+    for (let k = 0; k <= 7 && lo * (1 - 0.03 * k) >= 48; k++) {
+      const ry = lo * (1 - 0.03 * k);
+      const a = aligned(ry, drift);
+      const score = a ? a.d + 0.5 * (1 - ry / lo) : Infinity;
+      if (a && score < bestScore) {
+        bestScore = score;
+        best = a.box;
+      }
+    }
+    return best;
+  };
+  let best = largest(0.3);
+  // where the copy runs close to the seam, let it move onto the photo's free side instead
+  // of shrinking to a token size
+  if (side && photo && (!best || best.ry < photo.h * 0.25)) {
+    const wider = largest(0.9);
+    if (wider && (!best || wider.ry > best.ry * 1.15)) best = wider;
+  }
+  if (best) return best;
+
+  // fallback: the largest free box anywhere in bounds, nearest the aligned position
+  const step = 6;
   const centres = (ry: number) => {
     const rx = ry / SLOT.aspect;
-    const over = narrow ? rx * 0.35 : 0;
     const list: [number, number][] = [];
-    for (let cy = top + ry; cy <= bottom - ry; cy += step)
-      for (let cx = rx - over; cx <= o.width + over - rx; cx += step) list.push([cx, cy]);
+    for (let cy = y0 + ry; cy <= y1 - ry; cy += step)
+      for (let cx = x0 + rx; cx <= x1 - rx; cx += step) list.push([cx, cy]);
     return { rx, list };
   };
   const feasible = (ry: number) => {
     const { rx, list } = centres(ry);
     return list.some(([cx, cy]) => fits(cx, cy, rx, ry));
   };
-
-  let lo = 56;
-  let hi = (bottom - top) * 0.46;
+  let lo = 48;
+  let hi = (y1 - y0) * 0.46;
   if (!feasible(lo)) return null;
   for (let i = 0; i < 10 && hi - lo > 2; i++) {
     const mid = (lo + hi) / 2;
@@ -182,15 +267,11 @@ export function findSculptureBox(stage: HTMLElement): Box | null {
   }
   const ry = lo;
   const { rx, list } = centres(ry);
-  // prefer the portrait's edge that faces the free space, at face height
-  const faceCx = face ? face.x + face.w / 2 : o.width / 2;
-  const prefX = photo ? (faceCx > o.width / 2 ? photo.x : photo.x + photo.w) : o.width / 2;
-  const prefY = face ? face.y + face.h / 2 : (top + bottom) / 2;
-  let best: Box | null = null;
+  const prefX = photo ? (side ? photo.x : freeRight ? x1 : x0) : o.width / 2;
   let bestD = Infinity;
   for (const [cx, cy] of list) {
     if (!fits(cx, cy, rx, ry)) continue;
-    const d = (cx - prefX) ** 2 + ((cy - prefY) * 0.6) ** 2;
+    const d = (cx - prefX) ** 2 + ((cy - faceCy) * 0.6) ** 2;
     if (d < bestD) {
       bestD = d;
       best = { cx, cy, rx, ry };

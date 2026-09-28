@@ -1,11 +1,11 @@
 import type { CSSProperties, ReactNode } from "react";
 
 /**
- * Fade-up entrance, done entirely in CSS (see `.reveal` in styles.css): scroll-driven
- * where the browser supports `animation-timeline: view()`, a short time-based fade
- * otherwise. There is no hidden starting state outside the animation itself, so if the
- * animation cannot run — no JS, unsupported CSS, Reading mode, reduced motion, print —
- * the content is simply visible. `delay` staggers the time-based variant (hero).
+ * Hero-only load-time entrance: a short CSS rise (see `.reveal` in styles.css), movement
+ * only — never transparent, so the name and role line are readable at first paint.
+ * Sections below have their own scroll-linked motifs (SectionShell `motif`). No animation
+ * (Reading mode, motion off, print, unsupported CSS) simply leaves the content in place.
+ * `delay` staggers the rise.
  */
 export function Reveal({
   children,

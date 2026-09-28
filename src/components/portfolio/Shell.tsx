@@ -1,7 +1,11 @@
-import { useEffect, useId, useRef, useState } from "react";
-import { Command as CommandIcon, Download, Menu, X } from "lucide-react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { BookOpen, Command as CommandIcon, Download, Mail, Menu, X } from "lucide-react";
 import { useViewMode, type ViewMode } from "@/lib/view-mode";
+import { contact } from "@/content/resume";
+import { useCompletionCue } from "@/lib/exploration";
 import {
+  dockView,
+  motionControl,
   nav,
   paletteView,
   resumeDownload,
@@ -12,6 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import { goToSection } from "@/lib/navigate";
 import { ActionLink, Meta } from "./primitives";
+import { ExploreTrigger } from "./ExplorePanel";
 
 export function ViewModeToggle({ className = "" }: { className?: string }) {
   const { mode, setMode } = useViewMode();
@@ -51,6 +56,37 @@ export function ViewModeToggle({ className = "" }: { className?: string }) {
   );
 }
 
+/**
+ * Motion on/off. A toggle button with a constant name ("Motion"); pressed = motion on.
+ * Off stops every animation, transition, pointer depth and the 3D loop site-wide.
+ */
+export function MotionToggle({ className = "" }: { className?: string }) {
+  const { reducedMotion, setReducedMotion } = useViewMode();
+  const on = !reducedMotion;
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      title={on ? motionControl.hintOn : motionControl.hintOff}
+      onClick={() => setReducedMotion(on)}
+      className={cn(
+        "inline-flex h-11 items-center gap-2 rounded-md border border-control px-3 text-small font-medium text-text transition-colors hover:bg-surface-2",
+        className,
+      )}
+    >
+      <span
+        aria-hidden
+        className={`h-2 w-2 rounded-full ${on ? "bg-accent shadow-[0_0_8px_var(--accent)]" : "bg-control"}`}
+      />
+      {motionControl.label}
+      {/* state shown visually; aria-pressed carries it for assistive technology */}
+      <span aria-hidden className="inline-block w-[3ch] font-meta text-muted">
+        {on ? motionControl.on : motionControl.off}
+      </span>
+    </button>
+  );
+}
+
 export function SiteHeader({
   active,
   onOpenPalette,
@@ -71,7 +107,7 @@ export function SiteHeader({
         <div className="flex min-w-0 items-center gap-5">
           <a
             href="#overview"
-            className="flex min-h-11 items-center gap-2.5 rounded-sm text-small font-semibold tracking-[-0.01em] text-text"
+            className="flex min-h-11 items-center gap-2.5 rounded-sm text-small font-semibold tracking-[-0.01em] whitespace-nowrap text-text"
           >
             <span aria-hidden className="h-2 w-2 rounded-[2px] bg-accent" />
             Ismail Murtaza
@@ -95,13 +131,14 @@ export function SiteHeader({
             <span className="sr-only sm:not-sr-only">{paletteView.trigger}</span>
             <kbd className="hidden font-meta text-muted xl:inline">{isMac ? "⌘K" : "Ctrl K"}</kbd>
           </button>
+          <MotionToggle className="hidden lg:inline-flex" />
           <ViewModeToggle className="hidden sm:inline-flex" />
           <ActionLink
             href={resumeDownload.href}
             download={resumeDownload.fileName}
             variant="secondary"
             size="sm"
-            className="hidden md:inline-flex"
+            className="hidden lg:inline-flex"
           >
             <Download aria-hidden className="h-4 w-4" />
             {resumeDownload.label}
@@ -113,14 +150,32 @@ export function SiteHeader({
   );
 }
 
-/** Desktop: a compact vertical rail of numbered links with hover/focus labels. */
+/**
+ * Desktop navigation dock (≥1024px): the numbered section links with one indicator that
+ * glides to the active section, hover/focus labels, and two always-available tools below —
+ * Reading mode and email. When the visitor finishes exploring, a light passes once down
+ * the dock (visual only).
+ */
 export function SectionRail({ active }: { active: SectionId }) {
+  const { mode, setMode } = useViewMode();
+  const reading = mode === "reading";
+  const index = Math.max(
+    0,
+    sections.findIndex((s) => s.id === active),
+  );
+  const cue = useCompletionCue();
   return (
     <nav
       aria-label={nav.railLabel}
-      className="fixed bottom-0 left-0 top-header z-40 hidden w-rail items-center justify-center border-r border-line lg:flex"
+      className="fixed top-header bottom-0 left-0 z-40 hidden w-rail flex-col items-center justify-center gap-6 border-r border-line lg:flex"
     >
-      <ol className="flex flex-col gap-1">
+      <ol className="relative flex flex-col gap-1" style={{ "--active": index } as CSSProperties}>
+        {/* the active-section indicator: one bar that glides between items */}
+        <span
+          aria-hidden
+          className="dock-indicator absolute top-0 left-0 h-11 w-0.5 rounded-full"
+        />
+        {cue && <span aria-hidden className="dock-trace absolute top-0 left-0 h-11 w-0.5" />}
         {sections.map((s) => {
           const isActive = s.id === active;
           return (
@@ -128,29 +183,134 @@ export function SectionRail({ active }: { active: SectionId }) {
               <a
                 href={`#${s.id}`}
                 aria-current={isActive ? "location" : undefined}
-                className={`peer relative flex h-11 w-12 items-center justify-center rounded-md font-meta transition-colors ${
+                className={`peer relative flex h-11 w-12 items-center justify-center rounded-md font-meta transition-[color,background-color,transform] duration-150 active:scale-95 ${
                   isActive ? "text-accent" : "text-muted hover:bg-surface hover:text-text"
                 }`}
               >
-                <span
-                  aria-hidden
-                  className={`absolute left-0 top-2 bottom-2 w-0.5 rounded-full transition-colors ${
-                    isActive ? "bg-accent" : "bg-transparent"
-                  }`}
-                />
                 <span aria-hidden>{s.num}</span>
                 <span className="sr-only">{s.rail}</span>
               </a>
-              <span
-                aria-hidden
-                className="pointer-events-none absolute left-full top-1/2 ml-3 -translate-y-1/2 whitespace-nowrap rounded-md border border-control bg-surface px-2.5 py-1 text-small text-text opacity-0 transition-opacity peer-hover:opacity-100 peer-focus-visible:opacity-100"
-              >
-                {s.rail}
-              </span>
+              <RailLabel>{s.rail}</RailLabel>
             </li>
           );
         })}
       </ol>
+
+      <div className="flex flex-col items-center gap-1 border-t border-line pt-4">
+        <ExploreTrigger variant="rail" />
+        <div className="relative">
+          <button
+            type="button"
+            aria-pressed={reading}
+            aria-label={dockView.readingMode}
+            onClick={() => setMode(reading ? "interactive" : "reading")}
+            className={`peer grid h-11 w-12 place-items-center rounded-md transition-[color,background-color,transform] duration-150 active:scale-95 ${
+              reading ? "bg-surface-2 text-accent" : "text-muted hover:bg-surface hover:text-text"
+            }`}
+          >
+            <BookOpen aria-hidden className="h-4 w-4" />
+          </button>
+          <RailLabel>{reading ? dockView.toInteractive : dockView.toReading}</RailLabel>
+        </div>
+        <div className="relative">
+          <a
+            href={contact.email.href}
+            className="peer grid h-11 w-12 place-items-center rounded-md text-muted transition-[color,background-color,transform] duration-150 hover:bg-surface hover:text-text active:scale-95"
+          >
+            <Mail aria-hidden className="h-4 w-4" />
+            <span className="sr-only">
+              {dockView.email} {contact.email.display}
+            </span>
+          </a>
+          <RailLabel>
+            {dockView.email} · {contact.email.display}
+          </RailLabel>
+        </div>
+      </div>
+    </nav>
+  );
+}
+
+/** A rail item's name, shown on hover and on keyboard focus (never hover-only). */
+function RailLabel({ children }: { children: ReactNode }) {
+  return (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute top-1/2 left-full ml-3 -translate-y-1/2 rounded-md border border-control bg-surface px-2.5 py-1 text-small whitespace-nowrap text-text opacity-0 transition-opacity peer-hover:opacity-100 peer-focus-visible:opacity-100"
+    >
+      {children}
+    </span>
+  );
+}
+
+/**
+ * Mobile navigation dock (<1024px), fixed to the bottom edge: where you are on the page
+ * (a lit segment glides along seven, and the section name changes with it), and what must
+ * always be one tap away — email and Reading mode — plus the exploration panel's trigger
+ * (so it never floats over content). Section links and the command palette stay in the
+ * header; nothing is hidden behind the dock.
+ */
+export function MobileDock({ active }: { active: SectionId }) {
+  const { mode, setMode } = useViewMode();
+  const reading = mode === "reading";
+  const index = Math.max(
+    0,
+    sections.findIndex((s) => s.id === active),
+  );
+  const current = sections[index];
+  const cue = useCompletionCue();
+  const tool =
+    "inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-md text-small font-medium transition-[color,background-color,transform] duration-150 active:scale-95";
+  return (
+    <nav
+      aria-label={dockView.label}
+      className="mobile-dock fixed inset-x-0 bottom-0 z-40 lg:hidden print:hidden"
+    >
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-10 border-t border-line bg-bg/92 backdrop-blur-md"
+      />
+      {/* where you are: seven segments, one lit segment glides to the active section */}
+      <div
+        aria-hidden
+        className="relative mx-gutter h-0.5 bg-line"
+        style={{ "--active": index } as CSSProperties}
+      >
+        <span className="dock-segment absolute top-0 left-0 h-full w-[calc(100%/7)]" />
+        {cue && <span className="dock-sweep absolute inset-0" />}
+      </div>
+      <div className="flex h-14 items-center justify-between gap-2 px-gutter">
+        <p className="min-w-0 truncate font-meta text-muted">
+          <span className="sr-only">{dockView.current}: </span>
+          <span key={current.id} className="dock-label inline-block">
+            <span className="text-accent">{current.num}</span> {current.rail}
+          </span>
+        </p>
+        <div className="flex shrink-0 items-center gap-1">
+          <a href={contact.email.href} className={`${tool} text-text hover:bg-surface-2`}>
+            <Mail aria-hidden className="h-4 w-4" />
+            <span className="sr-only">
+              {dockView.email} {contact.email.display}
+            </span>
+          </a>
+          <button
+            type="button"
+            aria-pressed={reading}
+            onClick={() => setMode(reading ? "interactive" : "reading")}
+            className={`${tool} border px-3 ${
+              reading
+                ? "border-accent bg-surface-2 text-text"
+                : "border-control text-text hover:bg-surface-2"
+            }`}
+          >
+            <BookOpen aria-hidden className="h-4 w-4" />
+            {dockView.reading}
+          </button>
+          {/* exploration lives in the dock on phones (the header keeps the command palette) */}
+          <ExploreTrigger variant="dock" />
+        </div>
+      </div>
+      <div className="h-[env(safe-area-inset-bottom)]" />
     </nav>
   );
 }
@@ -236,6 +396,7 @@ function MobileMenu({ active }: { active: SectionId }) {
               <Meta>{viewModeControl.groupLabel}</Meta>
               <ViewModeToggle />
             </div>
+            <MotionToggle />
             <ActionLink
               href={resumeDownload.href}
               download={resumeDownload.fileName}

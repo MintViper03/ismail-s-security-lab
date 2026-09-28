@@ -4,15 +4,15 @@ Personal portfolio for **Ismail Murtaza** — Penetration Tester | Security Engi
 
 ## Tech Stack
 
-| Layer     | Technology                                                                        |
-| --------- | --------------------------------------------------------------------------------- |
-| Framework | [TanStack Start](https://tanstack.com/start) (SSR)                                |
-| UI        | [React 19](https://react.dev) · TypeScript                                        |
-| Styling   | [Tailwind CSS v4](https://tailwindcss.com) · [shadcn/ui](https://ui.shadcn.com)   |
-| 3D        | [three.js](https://threejs.org) (lazy-loaded, desktop only, static SVG fallback)  |
-| Motion    | CSS (scroll-driven where supported) · [Lenis](https://lenis.darkroom.engineering) |
-| Palette   | Radix Dialog + [cmdk](https://cmdk.paco.me) (lazy-loaded)                         |
-| Linting   | ESLint · Prettier                                                                 |
+| Layer     | Technology                                                                                 |
+| --------- | ------------------------------------------------------------------------------------------ |
+| Framework | [TanStack Start](https://tanstack.com/start) (SSR)                                         |
+| UI        | [React 19](https://react.dev) · TypeScript                                                 |
+| Styling   | [Tailwind CSS v4](https://tailwindcss.com) · [shadcn/ui](https://ui.shadcn.com)            |
+| 3D        | [three.js](https://threejs.org) (lazy-loaded, desktop only, static SVG fallback)           |
+| Motion    | CSS scroll-driven animations on native scrolling · one motion switch (`html[data-motion]`) |
+| Palette   | Radix Dialog + [cmdk](https://cmdk.paco.me) (lazy-loaded)                                  |
+| Linting   | ESLint · Prettier                                                                          |
 
 ## Getting Started
 
@@ -40,7 +40,7 @@ src/
 │   │   └── projects/      # Conceptual project diagrams (SVG)
 │   └── ui/                # shadcn/ui primitives
 ├── content/               # resume.ts (facts), site.ts (UI labels), highlights.ts, sources.ts
-├── hooks/                 # Lenis, media queries, active section, dwell tracking
+├── hooks/                 # active section, dwell tracking, stage parallax, scroll anchor
 ├── lib/                   # View mode, exploration store, UI storage, navigation, utils
 ├── routes/
 │   ├── __root.tsx         # HTML shell, meta + JSON-LD, 404/error pages

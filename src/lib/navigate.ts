@@ -1,16 +1,14 @@
-import { readViewMode } from "./view-mode";
+import { readReducedMotion, readViewMode } from "./view-mode";
 
 /**
  * Moves to a page section the same way an in-page link would, then puts keyboard focus
- * on its heading so the next Tab continues from there. Instant in Reading mode or under
- * reduced motion; smooth otherwise. Updates the hash without a second jump.
+ * on its heading so the next Tab continues from there. Instant in Reading mode or with
+ * motion off; native smooth scrolling otherwise. Updates the hash without a second jump.
  */
 export function goToSection(id: string) {
   const section = document.getElementById(id);
   if (!section) return;
-  const smooth =
-    readViewMode() === "interactive" &&
-    !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const smooth = readViewMode() === "interactive" && !readReducedMotion();
   section.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
   history.replaceState(null, "", `#${id}`);
 

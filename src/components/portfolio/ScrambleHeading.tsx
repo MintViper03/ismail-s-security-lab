@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { readReducedMotion } from "@/lib/view-mode";
 
 const SCRAMBLE_CHARS = "!<>-_\\/[]{}=+*^?#01";
 const DURATION = 900;
@@ -29,7 +30,7 @@ export function ScrambleHeading({
     const el = ref.current;
     if (!el) return;
     el.textContent = text;
-    if (!animate || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!animate || readReducedMotion()) return;
 
     let raf = 0;
     const unlock = () => {
